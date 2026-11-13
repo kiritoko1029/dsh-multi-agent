@@ -1,0 +1,119 @@
+{
+  "name": "dsh-multi-agent",
+  "version": "0.9.0",
+  "private": true,
+  "engines": {
+    "dsh": "0.2.2-rc.1 || 0.2.2-rc.2 || 0.2.2-rc.3"
+  },
+  "description": "Prompt-routed DSH, Codex, Kimi Code, and Antigravity (agy) subagent delegation for DeepSeek Harness.",
+  "license": "MIT",
+  "author": "Jerry Chen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kiritoko1029/dsh-multi-agent.git"
+  },
+  "homepage": "https://github.com/kiritoko1029/dsh-multi-agent#readme",
+  "bugs": {
+    "url": "https://github.com/kiritoko1029/dsh-multi-agent/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "subagent",
+    "codex",
+    "kimi-code",
+    "antigravity",
+    "multi-agent"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client-bundle.js",
+    "./acp-provider": "./acp-provider.js",
+    "./agy-provider": "./agy-provider.js",
+    "./agy-provider/locale/*.json": "./agy-provider/locale/*.json",
+    "./agy-provider/icon": "./icon.svg",
+    "./codex-provider": "./codex-provider.js",
+    "./availability": "./availability.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./acp-provider/locale/*.json": "./acp-provider/locale/*.json",
+    "./acp-provider/icon": "./icon.svg",
+    "./codex-provider/locale/*.json": "./codex-provider/locale/*.json",
+    "./codex-provider/icon": "./icon.svg",
+    "./availability/locale/*.json": "./availability/locale/*.json",
+    "./availability/icon": "./icon.svg",
+    "./delegation-policy": "./delegation-policy.js",
+    "./delegation-policy/locale/*.json": "./delegation-policy/locale/*.json",
+    "./delegation-policy/icon": "./icon.svg",
+    "./task-monitor": "./task-monitor.js",
+    "./task-monitor/locale/*.json": "./task-monitor/locale/*.json",
+    "./task-monitor/icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "acp-provider.js",
+    "agy-provider.js",
+    "agy-provider/locale/*.json",
+    "codex-provider.js",
+    "availability.js",
+    "lib/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "acp-provider/locale/*.json",
+    "codex-provider/locale/*.json",
+    "availability/locale/*.json",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "INSTALL.zh.md",
+    "SHARE_NOTES.md",
+    "THIRD_PARTY_NOTICES.md",
+    "delegation-policy.js",
+    "task-monitor.js",
+    "tasks-client.js",
+    "client-bundle.js",
+    "delegation-policy/locale/*.json",
+    "task-monitor/locale/*.json",
+    "scripts/*.mjs"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/run-tests.mjs",
+    "test:contracts": "node scripts/verify-runtime-contracts.mjs",
+    "build": "node scripts/build-client.mjs",
+    "release:pack": "node scripts/build-release.mjs",
+    "release:notes": "node scripts/extract-changelog.mjs"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.4.0",
+    "@deepseek-ai/schemastery": "~3.19.0",
+    "@openai/codex": "0.153.4",
+    "markdown-it": "14.1.0",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-subagent-codex": "0.2.2-rc.1"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
+      ]
+    }
+  }
+}

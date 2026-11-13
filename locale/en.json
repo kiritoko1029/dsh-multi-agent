@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Multi-agent dispatch",
+    "description": "Route self-contained tasks to DSH, Codex, Kimi Code, or Antigravity (agy) with prompt-based rules, optional user selection, and managed result delivery."
+  }
+}

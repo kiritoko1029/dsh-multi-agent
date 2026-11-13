@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Codex router provider",
+    "description": "Register a separate Codex subagent provider named codex-router by default. Its optional default model is volatile and read again before every run, while official permission modes, environment overrides, and disposal grace remain supported. The reserved name codex is rejected to avoid replacing the official provider."
+  }
+}

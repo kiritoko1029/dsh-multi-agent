@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Antigravity（agy）ACP",
+    "description": "通过 Agent Client Protocol 运行 Google Antigravity CLI 子代理，支持模型、思考强度、权限策略和会话续接。"
+  }
+}

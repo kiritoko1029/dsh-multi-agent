@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Local agent availability",
+    "description": "Detect local Codex, Kimi Code, and Antigravity (agy) executables before enabling their providers, keeping DSH as the local fallback."
+  }
+}

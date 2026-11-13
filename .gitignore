@@ -1,0 +1,16 @@
+node_modules/
+.dsh/
+*.log
+.DS_Store
+
+# Build artifacts: published as GitHub Release assets, never committed.
+dist/
+*.tgz
+releases/**/*.tgz
+releases/**/*.zip
+releases/**/*.sha256
+diagnostics/**/*.zip
+
+# Local scratch verification scripts.
+.debug-*.mjs
+.verify-*.mjs

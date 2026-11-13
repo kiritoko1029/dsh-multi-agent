@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Kimi Code ACP",
+    "description": "通过 Agent Client Protocol 运行一次性 Kimi Code 子代理，支持原生取消和权限策略。"
+  }
+}

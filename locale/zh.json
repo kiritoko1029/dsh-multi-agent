@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "多 Agent 派发",
+    "description": "按自然语言规则把独立任务派发给 DSH、Codex、Kimi Code 或 Antigravity（agy），支持自动路由、用户选择和原生结果回传。"
+  }
+}

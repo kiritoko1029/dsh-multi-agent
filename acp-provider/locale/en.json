@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Kimi Code ACP",
+    "description": "Run one-shot Kimi Code subagents through the Agent Client Protocol with managed cancellation and permissions."
+  }
+}

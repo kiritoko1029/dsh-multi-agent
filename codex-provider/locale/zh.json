@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Codex 路由 Provider",
+    "description": "注册独立的 Codex 子代理 Provider，默认名称为 codex-router。可选默认模型支持 volatile，并在每次运行前读取最新值；同时保留官方权限模式、环境变量覆盖和进程释放宽限配置。拒绝使用保留名称 codex，避免覆盖官方 Provider。"
+  }
+}

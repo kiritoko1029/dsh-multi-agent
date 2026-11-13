@@ -1,0 +1,51 @@
+name: CI
+
+# The plugin is verified on macOS (see README "支持边界"); Linux and Windows are
+# not acceptance-tested, so the test job intentionally runs on macOS only.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Syntax check
+        run: npm run check
+
+      - name: Build client bundle
+        run: npm run build
+
+      - name: Fail when the committed client bundle is stale
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- client-bundle.js; then
+            echo "::error::client-bundle.js is out of date; run 'npm run build' and commit the result"
+            git diff --stat -- client-bundle.js
+            exit 1
+          fi
+
+      - name: Test
+        run: npm test

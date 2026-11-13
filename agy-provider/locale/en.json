@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Antigravity (agy) ACP",
+    "description": "Run Google Antigravity CLI subagents over the Agent Client Protocol with model and reasoning settings, permission policies, and session continuation."
+  }
+}

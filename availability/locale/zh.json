@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "本机 Agent 可用性",
+    "description": "启用 Codex、Kimi Code 和 Antigravity（agy）前检测本机可执行文件，缺失时阻止启用并保留 DSH 兜底。"
+  }
+}
