@@ -15,7 +15,7 @@
   - `full access`：完全访问。Codex 使用 bypass 线程模式；agy 追加原生 `--dangerously-skip-permissions`；Kimi 的 acp 子命令没有公开的跳过参数，按自动允许全部申请实现（文档如实标注）。
   - `ask request`：逐次询问。Codex 以 on-request 线程运行（无自动审查器），每次升级连同 ACP 的每次申请都送主会话审批链。
 
-Codex 在主会话审批 / 人工审批 / 允许所有策略下使用新的 ask-request 线程参数（`approvalPolicy: on-request` + `sandbox: workspace-write`、无自动审查器），因此真实的权限事件会到达本插件并按策略送审；批准时命令/文件申请返回 `accept`，权限升级回显所申请的权限。Kimi 与 agy 的 ACP `session/request_permission` 同样按策略决定：一次授权只选 `allow_once`（子代理未提供时拒绝，绝不扩大授权），持续授权仅出现在用户选择"始终允许"或 `full-access` 等级且子代理提供 `allow_always` 时；拒绝优先回选子代理提供的 `reject_once` 选项，未提供才按取消返回。权限申请与结果会以活动条目显示在任务面板；所有未决路径 fail-closed（拒绝），运行取消后迟到的批准一律作废。
+Codex 在主会话审批 / 人工审批 / 允许所有策略下使用新的 ask-request 线程参数（`approvalPolicy: on-request` + `sandbox: workspace-write`、无自动审查器），因此真实的权限事件会到达本插件并按策略送审；批准时命令/文件申请返回 `accept`，权限升级回显所申请的权限。Kimi 与 agy 的 ACP `session/request_permission` 同样按策略决定：一次授权只选 `allow_once`（子代理未提供时拒绝，绝不扩大授权），持续授权仅出现在用户选择"始终允许"或 `full-access` 等级且子代理提供 `allow_always` 时；拒绝优先回选子代理提供的 `reject_once` 选项，未提供才按取消返回。审批卡片会解析出具体操作——命令（`command:`）、目标路径（`path:`）和内容预览（`content:`），并兼容 Kimi（动作写在 `content` 文本块）与 agy（`kind` / `locations` / `diff` / `rawInput`）两种载荷；缺少 `kind` 时按工具名推断类别，中文任务显示中文类别（如“子代理权限请求（写入文件）”）。权限申请与结果会以活动条目显示在任务面板；所有未决路径 fail-closed（拒绝），运行取消后迟到的批准一律作废。
 
 **升级说明：** 从 0.8.x 升级后，未改动过策略的安装默认从 `reject`（Kimi/agy）或自动审查（Codex `approve-for-me`）变为主会话审批——这是收紧交互而非放权（不再自动放行的同时也不会自动拒绝，改由主会话决定）；如需保持旧行为，在设置中把策略改为 `reject` 即可。已保存的 `allow` / `reject` 值不受影响。
 

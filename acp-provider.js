@@ -111,18 +111,99 @@ function permissionRequestKind(kind) {
   return ACP_TOOL_KINDS.has(candidate) ? candidate : 'unknown'
 }
 
-/** Human-readable permission summary from one ACP request_permission payload. */
+/**
+ * Human-facing kind for the approval heading. ACP agents are free to omit
+ * `kind` (kimi-code does) and publish only a tool title, so fall back to the
+ * programmatic name and title instead of showing "unknown".
+ */
+function permissionKindLabel(call) {
+  const known = permissionRequestKind(call?.kind)
+  if (known !== 'unknown') return known
+  const hint = `${call?.name ?? ''} ${call?.title ?? ''}`.toLowerCase()
+  if (/(^|\W)(bash|shell|command|exec|run|terminal)(\W|$)/.test(hint)) return 'command'
+  if (/(^|\W)(write|edit|create|patch|apply|save)(\W|$)/.test(hint)) return 'write'
+  if (/(^|\W)(read|view|open|cat|head|tail|list)(\W|$)/.test(hint)) return 'read'
+  if (/(^|\W)(delete|remove|rm|unlink)(\W|$)/.test(hint)) return 'delete'
+  if (/(^|\W)(search|grep|glob|find)(\W|$)/.test(hint)) return 'search'
+  if (/(^|\W)(fetch|http|web|url)(\W|$)/.test(hint)) return 'fetch'
+  return 'unknown'
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim() !== '') return value.trim()
+  }
+  return undefined
+}
+
+function clipText(text, limit) {
+  const value = typeof text === 'string' ? text.trim() : ''
+  if (value.length <= limit) return value
+  return `${value.slice(0, limit - 1)}…`
+}
+
+/**
+ * ACP agents announce the concrete action in different fields: kimi-code puts
+ * it in a content text block, agy in `locations`/`rawInput`/`diff` blocks.
+ * Collect every carrier so one summary works for both.
+ */
+function acpPermissionFacts(call) {
+  const raw = call?.rawInput
+  const rawObject = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? raw : undefined
+  const texts = []
+  let diffPath
+  let diffText
+  let terminal
+  for (const block of Array.isArray(call?.content) ? call.content : []) {
+    if (block?.type === 'content' && block.content?.type === 'text') texts.push(block.content.text)
+    else if (block?.type === 'diff') {
+      diffPath ??= block.path
+      diffText ??= block.newText
+    } else if (block?.type === 'terminal') terminal ??= block.terminalId
+  }
+  const locations = (Array.isArray(call?.locations) ? call.locations : [])
+    .map((location) => location?.path)
+    .filter((path) => typeof path === 'string' && path !== '')
+  return {
+    command: firstText(rawObject?.CommandLine, rawObject?.commandLine, rawObject?.command, rawObject?.cmd),
+    path: firstText(locations[0], diffPath, rawObject?.Path, rawObject?.path, rawObject?.file_path, rawObject?.filePath),
+    content: firstText(diffText, rawObject?.Content, rawObject?.content, rawObject?.new_string, rawObject?.newText),
+    texts,
+    terminal,
+  }
+}
+
+/** Strip the ACP notice wrapper so the card shows the action, not the preamble. */
+function stripApprovalNotice(text) {
+  return typeof text === 'string' ? text.replace(/^\s*requesting approval to\s+/i, '').trim() : ''
+}
+
+/**
+ * Concrete detail for one ACP request_permission payload. The title is
+ * rendered separately by the approval card, so this carries only what the
+ * agent actually intends to touch: command, path, and a bounded content
+ * preview (content blocks, diff, or rawInput fallback).
+ */
 function acpPermissionSummary(params) {
   const call = params.toolCall
-  const kind = permissionRequestKind(call?.kind)
-  const title = typeof call?.title === 'string' && call.title ? call.title.trim() : ''
-  const parts = [`tool kind: ${kind}`]
-  if (title) parts.push(title)
-  const raw = call?.rawInput
-  if (raw !== null && raw !== undefined && (typeof raw === 'string' ? raw.trim() : JSON.stringify(raw))) {
-    const text = typeof raw === 'string' ? raw : JSON.stringify(raw)
-    parts.push(text.length > 400 ? `${text.slice(0, 399)}…` : text)
+  const facts = acpPermissionFacts(call)
+  const parts = []
+  if (facts.command !== undefined) parts.push(`command: ${clipText(facts.command, 300)}`)
+  if (facts.path !== undefined) parts.push(`path: ${clipText(facts.path, 300)}`)
+  if (facts.content !== undefined) parts.push(`content: ${clipText(facts.content, 240)}`)
+  for (const text of facts.texts) {
+    const notice = stripApprovalNotice(text)
+    if (notice !== '') parts.push(clipText(notice, 300))
   }
+  if (facts.terminal !== undefined) parts.push(`terminal: ${facts.terminal}`)
+  if (parts.length === 0) {
+    const raw = call?.rawInput
+    if (raw !== undefined && raw !== null) {
+      const text = typeof raw === 'string' ? raw : JSON.stringify(raw)
+      if (typeof text === 'string' && text.trim() !== '') parts.push(clipText(text, 300))
+    }
+  }
+  if (parts.length === 0) parts.push(`tool kind: ${permissionRequestKind(call?.kind)}`)
   return parts.join(' — ')
 }
 
@@ -341,14 +422,16 @@ async function startAcpRun(request, spec) {
     if (update.sessionUpdate === 'agent_message_chunk') fold.pushText(acpContentText(update.content))
     return Promise.resolve()
   }).onRequest(methods.client.session.requestPermission, async ({ params }) => {
-    const request = permissionRequestKind(params.toolCall?.kind)
+    const request = permissionKindLabel(params.toolCall)
+    const permissionTitle = typeof params.toolCall?.title === 'string' && params.toolCall.title ? params.toolCall.title : undefined
+    const permissionDetail = acpPermissionSummary(params)
     const allowOptions = acpAllowOptions(params)
     const rejectOptions = (Array.isArray(params.options) ? params.options : [])
       .filter((option) => option?.kind === 'reject_once' || option?.kind === 'reject_always')
     const permissionTraceId = `permission-${permissionCounter()}`
     const observeStatus = (status, text) => {
       try {
-        spec.observe?.({ sessionUpdate: 'tool_call', toolCallId: permissionTraceId, title: `Permission request: ${acpPermissionSummary(params)}`, status, ...text === undefined ? {} : { content: [{ type: 'content', content: { type: 'text', text } }] } })
+        spec.observe?.({ sessionUpdate: 'tool_call', toolCallId: permissionTraceId, title: `Permission request: ${[permissionTitle, permissionDetail].filter(Boolean).join(' — ')}`, status, ...text === undefined ? {} : { content: [{ type: 'content', content: { type: 'text', text } }] } })
       } catch {}
     }
     observeStatus('pending')
@@ -356,8 +439,8 @@ async function startAcpRun(request, spec) {
     try {
       decision = await spec.askPermission?.({
         kindLabel: request,
-        title: typeof params.toolCall?.title === 'string' && params.toolCall.title ? params.toolCall.title : undefined,
-        detail: acpPermissionSummary(params),
+        title: permissionTitle,
+        detail: permissionDetail,
         canAlways: allowOptions.some((option) => option.kind === 'allow_always'),
       }) ?? { outcome: 'deny', scope: 'once', source: 'policy-reject' }
     } catch {

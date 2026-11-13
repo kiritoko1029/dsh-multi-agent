@@ -69,11 +69,21 @@ process.stdin.on('data', (chunk) => {
         pendingPromptId = id
         pendingSessionId = params.sessionId
         const alwaysOnly = process.env.ACP_ASK_PERMISSION === 'always-only'
+        const shape = process.env.ACP_PERMISSION_SHAPE
+        const toolCall = shape === 'kimi-write'
+          ? { toolCallId: 'perm-tool-1', title: 'Write', content: [{ type: 'content', content: { type: 'text', text: 'Requesting approval to Writing /tmp/probe/hello.txt' } }] }
+          : shape === 'kimi-command'
+            ? { toolCallId: 'perm-tool-1', title: 'Bash', content: [{ type: 'content', content: { type: 'text', text: 'Requesting approval to Running: echo probe-ok' } }] }
+            : shape === 'agy-write'
+              ? { toolCallId: 'perm-tool-1', kind: 'edit', status: 'pending', title: 'File hello.txt', name: 'write_file', content: [{ type: 'diff', path: '/tmp/probe/hello.txt', newText: 'hello from probe\\n' }], locations: [{ path: '/tmp/probe/hello.txt' }], rawInput: { Content: 'hello from probe\\n', Overwrite: true, Path: '/tmp/probe/hello.txt' } }
+              : shape === 'agy-command'
+                ? { toolCallId: 'perm-tool-1', kind: 'execute', status: 'pending', title: 'echo probe-ok', name: 'run_command', rawInput: { CommandLine: 'echo probe-ok' } }
+                : { kind: 'execute', title: 'Run project tests', toolCallId: 'perm-tool-1' }
         process.stdout.write(JSON.stringify({
           jsonrpc: '2.0', id: 'perm-ask-1', method: 'session/request_permission',
           params: {
             sessionId: params.sessionId,
-            toolCall: { kind: 'execute', title: 'Run project tests', toolCallId: 'perm-tool-1' },
+            toolCall,
             options: alwaysOnly ? [
               { optionId: 'allow-always', name: 'Always allow', kind: 'allow_always' },
               { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' },
@@ -455,6 +465,105 @@ test('main-session policy routes through the session approval chain', async () =
   assert.equal(approvalRequests[0].agent.id, 'parent-1')
   assert.match(approvalRequests[0].reason, /Run project tests/)
   assert.deepEqual(permissionEntry(requests), { outcome: { outcome: 'selected', optionId: 'allow-once' } })
+})
+
+test('kimi-style write ask names the target file in the approval reason', async () => {
+  const approvalRequests = []
+  const agent = harness(undefined, undefined, { ACP_ASK_PERMISSION: '1', ACP_PERMISSION_SHAPE: 'kimi-write' }, { kimiCode: true }, {
+    permission: 'main-session',
+    parent: { id: 'parent-1' },
+    approval: {
+      async request(req) {
+        approvalRequests.push(req)
+        return 'allowed-once'
+      },
+    },
+  })
+  await agent.run()
+  assert.equal(approvalRequests.length, 1)
+  assert.match(approvalRequests[0].reason, /Sub-agent permission request \(write\)/)
+  assert.match(approvalRequests[0].reason, /Write/)
+  assert.match(approvalRequests[0].reason, /Writing \/tmp\/probe\/hello\.txt/)
+})
+
+test('kimi-style command ask carries the command line in the approval reason', async () => {
+  const approvalRequests = []
+  const agent = harness(undefined, undefined, { ACP_ASK_PERMISSION: '1', ACP_PERMISSION_SHAPE: 'kimi-command' }, { kimiCode: true }, {
+    permission: 'main-session',
+    parent: { id: 'parent-1' },
+    approval: {
+      async request(req) {
+        approvalRequests.push(req)
+        return 'allowed-once'
+      },
+    },
+  })
+  await agent.run()
+  assert.equal(approvalRequests.length, 1)
+  assert.match(approvalRequests[0].reason, /Sub-agent permission request \(command\)/)
+  assert.match(approvalRequests[0].reason, /Running: echo probe-ok/)
+})
+
+test('agy-style write ask carries path and content preview in the approval reason', async () => {
+  const approvalRequests = []
+  const agent = harness(undefined, undefined, { ACP_ASK_PERMISSION: '1', ACP_PERMISSION_SHAPE: 'agy-write' }, { kimiCode: true }, {
+    permission: 'main-session',
+    parent: { id: 'parent-1' },
+    approval: {
+      async request(req) {
+        approvalRequests.push(req)
+        return 'allowed-once'
+      },
+    },
+  })
+  await agent.run()
+  assert.equal(approvalRequests.length, 1)
+  assert.match(approvalRequests[0].reason, /Sub-agent permission request \(edit\)/)
+  assert.match(approvalRequests[0].reason, /path: \/tmp\/probe\/hello\.txt/)
+  assert.match(approvalRequests[0].reason, /content: hello from probe/)
+})
+
+test('agy-style command ask carries the command line in the approval reason', async () => {
+  const approvalRequests = []
+  const agent = harness(undefined, undefined, { ACP_ASK_PERMISSION: '1', ACP_PERMISSION_SHAPE: 'agy-command' }, { kimiCode: true }, {
+    permission: 'main-session',
+    parent: { id: 'parent-1' },
+    approval: {
+      async request(req) {
+        approvalRequests.push(req)
+        return 'allowed-once'
+      },
+    },
+  })
+  await agent.run()
+  assert.equal(approvalRequests.length, 1)
+  assert.match(approvalRequests[0].reason, /Sub-agent permission request \(execute\)/)
+  assert.match(approvalRequests[0].reason, /command: echo probe-ok/)
+})
+
+test('a Chinese task renders the permission heading with a Chinese kind label', async () => {
+  const approvalRequests = []
+  const asker = createPermissionAsker({
+    ctx: { get: (name) => name === 'approval' ? {
+      async request(request) {
+        approvalRequests.push(request)
+        return 'allowed-once'
+      },
+    } : undefined },
+    parent: { id: 'parent-1' },
+    policy: 'main-session',
+    subagentMode: 'auto',
+    backend: 'acp',
+    agentLabel: 'Kimi',
+    language: 'zh-CN',
+    signal: new AbortController().signal,
+  })
+  const decision = await asker({ kindLabel: 'write', title: 'Write', detail: 'path: /tmp/probe/hello.txt' })
+  assert.deepEqual(decision, { outcome: 'allow', scope: 'once', source: 'main-session' })
+  assert.match(approvalRequests[0].reason, /子代理权限请求（写入文件）/)
+  assert.match(approvalRequests[0].reason, /path: \/tmp\/probe\/hello\.txt/)
+  await asker({ kindLabel: 'execute', title: 'echo probe-ok', detail: 'command: echo probe-ok' })
+  assert.match(approvalRequests[1].reason, /子代理权限请求（执行命令）/)
 })
 
 test('main-session rejection denies the ask without falling through to a card', async () => {

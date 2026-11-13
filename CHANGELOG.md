@@ -2,6 +2,18 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
+## [0.9.1] - 2026-11-13
+
+### 修复
+
+- 子代理权限申请现在会显示**具体要做什么**：ACP `session/request_permission` 的命令（`command:`）、目标路径（`path:`）和内容预览（`content:`）都会被解析进审批卡片，不再只剩 `Write` / `Bash` 这类工具标题。
+- 兼容不同 ACP 实现的信息位置：Kimi Code 只在 `toolCall.content` 的文本块里给出动作说明（没有 `kind`、`rawInput`、`locations`）；agy 则用 `kind`、`locations`、`diff` 内容块和 `rawInput`（`CommandLine` / `Path` / `Content`）。两种载荷都能还原出命令与文件路径。
+- 缺少 `kind` 时按工具名或标题推断类别（`Bash` → 执行命令、`Write` → 写入文件等）；中文任务下审批标题显示中文类别（如“子代理权限请求（写入文件）”），不再出现“（unknown）”。
+
+### 测试
+
+- 新增 5 项权限详情测试，夹具取自 Kimi 与 agy 实际 ACP 会话捕获的原始载荷；`npm test` 共 366 项，365 通过、0 失败、1 项原有条件跳过。
+
 ## [0.9.0] - 2026-11-13
 
 ### 新增

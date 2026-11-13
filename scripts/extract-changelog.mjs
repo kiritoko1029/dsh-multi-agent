@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 // Print the CHANGELOG.md section for one version, used as GitHub Release notes.
-// Usage: node scripts/extract-changelog.mjs v0.9.0
+// Usage: node scripts/extract-changelog.mjs v0.9.1
 const requested = (process.argv[2] ?? '').trim().replace(/^v/, '')
 if (!requested) {
   console.error('Usage: node scripts/extract-changelog.mjs <version>')
