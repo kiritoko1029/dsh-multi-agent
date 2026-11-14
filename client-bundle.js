@@ -146,6 +146,27 @@ window.__ModuleLoader__.load({
         'common.modelsReady': 'Model suggestions loaded. Manual entries are also allowed.',
         'common.retryModels': 'Retry model list',
         'common.commandPlaceholder': 'Leave blank for auto-detection, or enter an absolute CLI path',
+        'header.tooltip': 'Open multi-agent dispatch settings',
+        'modal.close': 'Close',
+        'modal.closeAria': 'Close multi-agent dispatch settings',
+        'modal.navAria': 'Settings sections',
+        'modal.nav.all': 'All settings',
+        'modal.nav.models': 'Models & reasoning',
+        'modal.nav.policy': 'Dispatch policy & rules',
+        'modal.nav.runtime': 'Runtime options',
+        'modal.unsavedBadge': 'Unsaved edits',
+        'modal.unsavedTitle': 'Unsaved changes',
+        'modal.unsavedConfirm': 'You have unsaved changes. Save before closing, discard edits, or continue editing.',
+        'modal.continueEditing': 'Continue editing',
+        'modal.saveAndClose': 'Save & close',
+        'modal.discardAndClose': 'Discard & close',
+        'modal.statusHeading': 'Providers',
+        'modal.statusAvailable': 'Ready',
+        'modal.statusUnavailable': 'Unavailable',
+        'modal.statusReadonly': 'Read-only',
+        'modal.modelsDescription': 'Default models, reasoning effort, and CLI executable paths for each backend.',
+        'modal.policyDescription': 'Choose how the main agent selects backends, fallback behavior, timeout, and prompt rules.',
+        'modal.runtimeDescription': 'Configure permission policies, shutdown grace periods, ACP arguments, and environment overrides.',
       },
       zh: {
         'unified.title': '多 Agent 派发',
@@ -268,39 +289,118 @@ window.__ModuleLoader__.load({
         'common.modelsReady': '模型建议已读取，也可手动输入。',
         'common.retryModels': '重新读取模型列表',
         'common.commandPlaceholder': '留空自动检测，或填写 CLI 的绝对路径',
+        'header.tooltip': '打开多 Agent 派发设置',
+        'modal.close': '关闭',
+        'modal.closeAria': '关闭多 Agent 派发设置',
+        'modal.navAria': '设置分组',
+        'modal.nav.all': '全部设置',
+        'modal.nav.models': '模型与思考强度',
+        'modal.nav.policy': '派发策略与规则',
+        'modal.nav.runtime': '运行参数',
+        'modal.unsavedBadge': '有未保存更改',
+        'modal.unsavedTitle': '存在未保存的更改',
+        'modal.unsavedConfirm': '当前有未保存的更改。请在关闭前保存、放弃更改，或继续编辑。',
+        'modal.continueEditing': '继续编辑',
+        'modal.saveAndClose': '保存并关闭',
+        'modal.discardAndClose': '放弃并关闭',
+        'modal.statusHeading': 'Agent 状态',
+        'modal.statusAvailable': '可用',
+        'modal.statusUnavailable': '不可用',
+        'modal.statusReadonly': '只读',
+        'modal.modelsDescription': '为每个执行后端配置默认模型、思考强度与 CLI 可执行路径。',
+        'modal.policyDescription': '配置主 Agent 选择后端的策略、兜底方案、超时时间及路由规则。',
+        'modal.runtimeDescription': '配置各外部后端的权限策略、进程退出宽限、启动参数与环境变量。',
       },
     }
 
-    const CSS = `
-.ma-settings{display:grid;gap:18px;max-width:1040px;color:inherit}
-.ma-settings *{box-sizing:border-box}
-.ma-section{display:grid;gap:14px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1)}
-.ma-section h2{margin:0;font-size:17px;line-height:1.4}
-.ma-section h3{margin:0;font-size:14px;line-height:1.4}
-.ma-section p{margin:0;font-size:13px;line-height:1.55;opacity:.76}
-.ma-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
-.ma-field{display:grid;gap:6px;min-width:0;font-size:13px;line-height:1.4}
-.ma-field>span{font-weight:500}
-.ma-field input,.ma-field select,.ma-field textarea{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit}
-.ma-field textarea{min-height:84px;resize:vertical;line-height:1.5}
-.ma-field textarea.ma-code{font-family:monospace;min-height:70px}
-.ma-field input:focus-visible,.ma-field select:focus-visible,.ma-field textarea:focus-visible,.ma-settings button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.ma-routes{display:grid;gap:12px}
-.ma-route{display:grid;grid-template-columns:minmax(140px,.3fr) minmax(260px,1fr) auto;gap:12px;align-items:end;padding:12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px}
-.ma-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.ma-settings button{padding:8px 13px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;cursor:pointer}
-.ma-settings button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}
-.ma-settings :disabled{opacity:.55;cursor:not-allowed}
-.ma-error{color:var(--dsw-alias-state-error-primary)!important;opacity:1!important}
-.ma-catalog{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.5;opacity:.76}
-.ma-model-fields{padding-top:2px;border-bottom:1px solid var(--dsw-alias-border-l2);padding-bottom:18px}
-.ma-settings fieldset{min-width:0;margin:0;padding:0;border:0;display:grid;gap:18px}
-@media(max-width:720px){.ma-route{grid-template-columns:1fr}.ma-route .ma-remove{justify-self:start}}
+    const HEADER_CSS = `
+.ma-header-utility{display:inline-flex;align-items:center;flex:0 0 auto;min-width:0}
+.ma-header-utility *{box-sizing:border-box}
+.ma-header-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;min-width:0;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
+.ma-header-btn:hover{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+.ma-header-btn[aria-expanded="true"]{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}
+.ma-header-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.ma-header-icon{width:14px;height:14px;flex:0 0 auto}
+.ma-header-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:540px){.ma-header-btn{padding:0 8px;gap:5px;font-size:11px;max-width:148px}}
 `
 
-    function validationError(code) {
+    const MODAL_CSS = `
+.ma-overlay-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:auto;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 72%,transparent);backdrop-filter:blur(4px);color:var(--dsw-alias-label-primary)}
+.ma-overlay-backdrop *{box-sizing:border-box}
+.ma-modal{display:flex;flex-direction:column;width:min(1180px,calc(100vw - 48px));height:min(85vh,920px);max-height:calc(100vh - 32px);min-width:0;min-height:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:16px;background:var(--dsw-alias-bg-overlay,var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-label-primary);pointer-events:auto;outline:none}
+.ma-modal-form{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;height:100%}
+.ma-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex:0 0 auto;padding:18px 22px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
+.ma-modal-heading{display:grid;gap:4px;min-width:0}
+.ma-modal-title-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ma-modal-header h2{margin:0;font-size:18px;font-weight:650;line-height:1.35;color:var(--dsw-alias-label-primary)}
+.ma-modal-header p{margin:0;font-size:13px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
+.ma-modal-close{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:32px;height:32px;padding:0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease}
+.ma-modal-close:hover{border-color:var(--dsw-alias-brand-primary)}
+.ma-modal-close svg{width:16px;height:16px}
+.ma-unsaved-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;flex:0 0 auto;padding:10px 22px;border-bottom:1px solid var(--dsw-alias-state-warn-primary);background:var(--dsw-alias-bg-layer-2);font-size:13px;line-height:1.45}
+.ma-unsaved-copy{color:var(--dsw-alias-label-primary);font-weight:500}
+.ma-unsaved-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ma-modal-body{display:grid;grid-template-columns:224px minmax(0,1fr);flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
+.ma-modal-status-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:24px;display:grid;place-items:center;text-align:center;color:var(--dsw-alias-label-secondary);font-size:14px}
+.ma-modal-nav{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;padding:16px 14px;border-right:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);overflow-y:auto}
+.ma-nav-list{display:grid;gap:6px}
+.ma-nav-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 11px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;font-weight:500;text-align:left;cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
+.ma-nav-btn:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l2)}
+.ma-nav-btn[aria-pressed="true"]{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
+.ma-dirty-dot{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--dsw-alias-state-warn-primary)}
+.ma-provider-list{display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}
+.ma-provider-list-title{margin:0;font-size:11px;font-weight:600;color:var(--dsw-alias-label-secondary);letter-spacing:.02em;text-transform:uppercase}
+.ma-provider-item{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.ma-provider-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-primary)}
+.ma-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;font-size:11px;font-weight:500;line-height:1.4;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.ma-badge[data-tone="ready"]{color:var(--dsw-alias-state-success-primary);border-color:var(--dsw-alias-border-l2)}
+.ma-badge[data-tone="warn"]{color:var(--dsw-alias-state-warn-primary);border-color:var(--dsw-alias-state-warn-primary)}
+.ma-badge[data-tone="idle"]{color:var(--dsw-alias-state-idle-primary)}
+.ma-modal-scroll{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 24px 24px;display:grid;align-content:start;gap:20px}
+.ma-settings{display:grid;gap:20px;min-width:0;color:inherit}
+.ma-settings>.ma-outer-fieldset{min-width:0;margin:0;padding:0;border:0;display:grid;gap:20px}
+.ma-section{display:grid;gap:16px;padding:18px 20px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1)}
+.ma-section-head{display:grid;gap:4px}
+.ma-section h2,.ma-section h3{margin:0;color:var(--dsw-alias-label-primary)}
+.ma-section h2{font-size:16px;font-weight:650;line-height:1.4}
+.ma-section h3{font-size:14px;font-weight:600;line-height:1.4}
+.ma-section p{margin:0;font-size:12.5px;line-height:1.55;color:var(--dsw-alias-label-secondary)}
+.ma-model-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ma-runtime-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.ma-card{display:grid;align-content:start;gap:12px;min-width:0;margin:0;padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
+.ma-card-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.ma-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.ma-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ma-field{display:grid;gap:6px;min-width:0;font-size:13px;line-height:1.4}
+.ma-field>span{font-weight:500;color:var(--dsw-alias-label-primary)}
+.ma-field input,.ma-field select,.ma-field textarea{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}
+.ma-field textarea{min-height:84px;resize:vertical;line-height:1.5}
+.ma-field textarea.ma-code{font-family:monospace;min-height:74px}
+.ma-field input:focus-visible,.ma-field select:focus-visible,.ma-field textarea:focus-visible,.ma-modal button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.ma-routes{display:grid;gap:10px}
+.ma-route{display:grid;grid-template-columns:minmax(150px,.28fr) minmax(240px,1fr) auto;gap:12px;align-items:end;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
+.ma-modal button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 13px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
+.ma-modal button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}
+.ma-modal .ma-btn-primary{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
+.ma-modal :disabled{opacity:.55;cursor:not-allowed}
+.ma-error{color:var(--dsw-alias-state-error-primary)!important;opacity:1!important}
+.ma-success{color:var(--dsw-alias-state-success-primary)!important;opacity:1!important}
+.ma-readonly-banner{margin:0;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:13px}
+.ma-catalog{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
+.ma-modal-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;flex:0 0 auto;padding:12px 22px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
+.ma-footer-status{flex:1 1 240px;min-width:0;font-size:13px;line-height:1.45;color:var(--dsw-alias-label-secondary)}
+.ma-footer-status p{margin:0}
+.ma-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
+@media(max-width:920px){.ma-model-grid,.ma-two-col{grid-template-columns:1fr}.ma-modal-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ma-modal-nav{flex-direction:row;align-items:center;overflow-x:auto;padding:10px 14px;border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}.ma-nav-list{display:flex;flex:1 0 auto;gap:6px}.ma-nav-btn{width:auto;white-space:nowrap;padding:7px 11px}.ma-provider-list{display:none}}
+@media(max-width:680px){.ma-overlay-backdrop{padding:8px}.ma-modal{width:calc(100vw - 16px);height:calc(100vh - 16px);max-height:calc(100vh - 16px);border-radius:12px}.ma-modal-header{padding:14px 16px 12px}.ma-modal-scroll{padding:14px 16px 18px}.ma-modal-footer{padding:10px 16px}.ma-route{grid-template-columns:1fr}.ma-route .ma-remove{justify-self:start}}
+@media(prefers-reduced-motion:reduce){.ma-overlay-backdrop *,.ma-header-utility *{transition:none!important}}
+`
+
+    function validationError(code, field) {
       const error = new Error(code)
       error.code = code
+      if (field) error.field = field
       return error
     }
 
@@ -314,46 +414,76 @@ window.__ModuleLoader__.load({
       return number
     }
 
+    function sectionForField(field) {
+      if (!field) return 'all'
+      if (field.startsWith('dsh.') || field.endsWith('.model') || field.endsWith('.reasoningEffort') || field.endsWith('.command')) return 'models'
+      if (['selectionMode', 'defaultAgent', 'timeoutSeconds', 'routes', 'additionalInstructions', 'taskPreamble'].includes(field)) return 'policy'
+      return 'runtime'
+    }
+
     /** Convert only edited fields into revision-fenced Host settings operations. */
     function buildOperations(kind, edits) {
       return Object.entries(edits).map(([field, value]) => {
-        if (field.startsWith('codex.') || field.startsWith('acp.') || field.startsWith('agy.')) {
-          const [owner, ...parts] = field.split('.')
-          const operation = buildOperations(owner, { [parts.join('.')]: value })[0]
-          return { ...operation, path: [owner, ...operation.path] }
+        try {
+          if (field.startsWith('codex.') || field.startsWith('acp.') || field.startsWith('agy.')) {
+            const [owner, ...parts] = field.split('.')
+            const operation = buildOperations(owner, { [parts.join('.')]: value })[0]
+            return { ...operation, path: [owner, ...operation.path] }
+          }
+          if (field === 'defaultAgent' || field === 'additionalInstructions' || field === 'taskPreamble') {
+            return typeof value === 'string' && value.trim() === '' ? { op: 'unset', path: [field] } : { op: 'set', path: [field], value }
+          }
+          if (field === 'model' || field === 'reasoningEffort' || field.startsWith('dsh.')) {
+            const path = field.split('.')
+            return typeof value === 'string' && value.trim() === '' ? { op: 'unset', path } : { op: 'set', path, value: typeof value === 'string' ? value.trim() : value }
+          }
+          if (field === 'timeoutSeconds') return { op: 'set', path: [field], value: numberValue(value, 1, 86400) }
+          if (field === 'disposeEofGraceMs' || field === 'disposeGraceMs') return { op: 'set', path: [field], value: numberValue(value, 1, 2147483647) }
+          if (field === 'command') {
+            if (typeof value !== 'string') throw validationError('common.commandRequired', field)
+            // Removing a user override reveals the package's auto-detected command.
+            return value.trim() === '' ? { op: 'unset', path: [field] } : { op: 'set', path: [field], value: value.trim() }
+          }
+          if (field === 'args') {
+            const args = typeof value === 'string' ? parseJson(value) : value
+            if (!Array.isArray(args) || args.some((item) => typeof item !== 'string')) throw validationError('common.invalidArgs', field)
+            return { op: 'set', path: [field], value: args }
+          }
+          if (field === 'env') {
+            const env = typeof value === 'string' ? parseJson(value) : value
+            if (env === null || typeof env !== 'object' || Array.isArray(env) || Object.values(env).some((item) => typeof item !== 'string')) throw validationError('common.invalidEnv', field)
+            return { op: 'set', path: [field], value: env }
+          }
+          if (field === 'routes') {
+            if (!Array.isArray(value) || value.length === 0) throw validationError('common.routesRequired', field)
+            const routes = value.map((route) => ({ agent: route.agent, prompt: typeof route.prompt === 'string' ? route.prompt.trim() : '' }))
+            if (routes.some((route) => !['codex', 'kimi-code', 'agy', 'dsh'].includes(route.agent) || route.prompt === '')) throw validationError('common.routesRequired', field)
+            return { op: 'set', path: [field], value: routes }
+          }
+          return { op: 'set', path: [field], value }
+        } catch (error) {
+          if (error && typeof error === 'object') error.field = field
+          throw error
         }
-        if (field === 'defaultAgent' || field === 'additionalInstructions' || field === 'taskPreamble') {
-          return typeof value === 'string' && value.trim() === '' ? { op: 'unset', path: [field] } : { op: 'set', path: [field], value }
-        }
-        if (field === 'model' || field === 'reasoningEffort' || field.startsWith('dsh.')) {
-          const path = field.split('.')
-          return typeof value === 'string' && value.trim() === '' ? { op: 'unset', path } : { op: 'set', path, value: typeof value === 'string' ? value.trim() : value }
-        }
-        if (field === 'timeoutSeconds') return { op: 'set', path: [field], value: numberValue(value, 1, 86400) }
-        if (field === 'disposeEofGraceMs' || field === 'disposeGraceMs') return { op: 'set', path: [field], value: numberValue(value, 1, 2147483647) }
-        if (field === 'command') {
-          if (typeof value !== 'string') throw validationError('common.commandRequired')
-          // Removing a user override reveals the package's auto-detected command.
-          return value.trim() === '' ? { op: 'unset', path: [field] } : { op: 'set', path: [field], value: value.trim() }
-        }
-        if (field === 'args') {
-          const args = typeof value === 'string' ? parseJson(value) : value
-          if (!Array.isArray(args) || args.some((item) => typeof item !== 'string')) throw validationError('common.invalidArgs')
-          return { op: 'set', path: [field], value: args }
-        }
-        if (field === 'env') {
-          const env = typeof value === 'string' ? parseJson(value) : value
-          if (env === null || typeof env !== 'object' || Array.isArray(env) || Object.values(env).some((item) => typeof item !== 'string')) throw validationError('common.invalidEnv')
-          return { op: 'set', path: [field], value: env }
-        }
-        if (field === 'routes') {
-          if (!Array.isArray(value) || value.length === 0) throw validationError('common.routesRequired')
-          const routes = value.map((route) => ({ agent: route.agent, prompt: typeof route.prompt === 'string' ? route.prompt.trim() : '' }))
-          if (routes.some((route) => !['codex', 'kimi-code', 'agy', 'dsh'].includes(route.agent) || route.prompt === '')) throw validationError('common.routesRequired')
-          return { op: 'set', path: [field], value: routes }
-        }
-        return { op: 'set', path: [field], value }
       })
+    }
+
+    function HeaderIcon() {
+      const paths = ['M4 6h16', 'M4 12h16', 'M4 18h16', 'M9 4v4', 'M15 10v4', 'M11 16v4']
+      return h('svg', {
+        className: 'ma-header-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+      }, paths.map((d) => h('path', { key: d, d })))
+    }
+
+    function CloseIcon() {
+      return h('svg', {
+        viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+      }, [
+        h('path', { key: 'a', d: 'M6 6l12 12' }),
+        h('path', { key: 'b', d: 'M18 6L6 18' }),
+      ])
     }
 
     function Field({ name, label, value, onChange, type = 'text', ...props }) {
@@ -445,6 +575,7 @@ window.__ModuleLoader__.load({
             revision, status: snapshots.router.status, writable: snapshots.router.writable,
             value: { ...snapshots.router.value, codex: snapshots.codex.value ?? {}, acp: snapshots.acp.value ?? {}, agy: snapshots.agy.value ?? {} },
             sections: Object.fromEntries(Object.entries(snapshots).map(([key, s]) => [key, s.status === 'ready' && s.writable])),
+            availability: Object.fromEntries(Object.entries(snapshots).map(([key, s]) => [key, s.status === 'ready'])),
           }
           return cached
         },
@@ -479,15 +610,133 @@ window.__ModuleLoader__.load({
       return face
     }
 
-    function ConfigForm({ form, t, loadCatalogs }) {
+    function createDispatchModalStore() {
+      let open = false
+      let trigger = null
+      const listeners = new Set()
+      const notify = () => {
+        for (const listener of [...listeners]) listener()
+      }
+      return {
+        getSnapshot: () => open,
+        getTrigger: () => trigger,
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => listeners.delete(listener)
+        },
+        open(triggerElement) {
+          if (triggerElement) trigger = triggerElement
+          else if (typeof document !== 'undefined') trigger = document.activeElement
+          if (open) return
+          open = true
+          notify()
+        },
+        close() {
+          if (!open) return
+          open = false
+          notify()
+        },
+        clearTrigger() {
+          trigger = null
+        },
+        dispose() {
+          open = false
+          trigger = null
+          listeners.clear()
+        },
+      }
+    }
+
+    function useDispatchModalOpen(store) {
+      const [open, setOpen] = useState(() => store.getSnapshot())
+      useEffect(() => {
+        setOpen(store.getSnapshot())
+        return store.subscribe(() => setOpen(store.getSnapshot()))
+      }, [store])
+      return open
+    }
+
+    const FOCUSABLE_SELECTOR = 'a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]:not([tabindex="-1"])'
+    function isElementVisible(element) {
+      if (!element || element.disabled) return false
+      if (typeof element.closest === 'function' && element.closest('[hidden]')) return false
+      if (typeof getComputedStyle === 'function') {
+        const style = getComputedStyle(element)
+        if (style.display === 'none' || style.visibility === 'hidden') return false
+      }
+      return true
+    }
+
+    function getFocusableElements(container) {
+      if (!container || typeof container.querySelectorAll !== 'function') return []
+      return [...container.querySelectorAll(FOCUSABLE_SELECTOR)].filter(isElementVisible)
+    }
+
+    function firstFocusable(container) {
+      return getFocusableElements(container)[0] || null
+    }
+
+    function trapTabInDialog(dialog, event) {
+      if (!dialog) return
+      const focusables = getFocusableElements(dialog)
+      if (focusables.length === 0) {
+        event.preventDefault?.()
+        dialog.focus?.()
+        return
+      }
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = typeof document !== 'undefined' ? document.activeElement : null
+      const inside = typeof dialog.contains === 'function' ? dialog.contains(active) : true
+      if (!inside) {
+        event.preventDefault?.()
+        ;(event.shiftKey ? last : first).focus?.()
+      } else if (event.shiftKey && (active === first || active === dialog)) {
+        event.preventDefault?.()
+        last.focus?.()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault?.()
+        first.focus?.()
+      }
+    }
+
+    function HeaderDispatchButton({ store, t }) {
+      const open = useDispatchModalOpen(store)
+      const buttonRef = useRef(null)
+      const label = t('unified.title')
+      return h('span', { className: 'ma-header-utility' },
+        h('style', null, HEADER_CSS),
+        h('button', {
+          ref: buttonRef,
+          type: 'button',
+          name: 'multi-agent-dispatch-trigger',
+          className: 'ma-header-btn',
+          title: t('header.tooltip'),
+          'aria-label': label,
+          'aria-haspopup': 'dialog',
+          'aria-expanded': open,
+          onClick: () => store.open(buttonRef.current),
+        },
+        h(HeaderIcon),
+        h('span', { className: 'ma-header-label' }, label)))
+    }
+
+    const MODAL_TITLE_ID = 'ma-dispatch-modal-title'
+    const MODAL_DESC_ID = 'ma-dispatch-modal-desc'
+
+    function ConfigForm({ form, t, loadCatalogs, onClose, dialogRef, closeButtonRef, attemptCloseRef }) {
       const kind = 'unified'
       const [snapshot, setSnapshot] = useState(() => form.getSnapshot())
       const [edits, setEdits] = useState({})
       const [result, setResult] = useState('')
       const [busy, setBusy] = useState(false)
+      const [activeSection, setActiveSection] = useState('all')
+      const [confirmClose, setConfirmClose] = useState(false)
       const baseline = useRef(null)
       const saving = useRef(false)
       const mounted = useRef(false)
+      const continueButtonRef = useRef(null)
+      const wasConfirmClose = useRef(false)
       const catalogGeneration = useRef({ dsh: 0, codex: 0, acp: 0, agy: 0 })
       const [catalogs, setCatalogs] = useState(() => Object.fromEntries(['dsh', 'codex', 'acp', 'agy'].map((key) => [key, { status: 'loading', groups: [], failures: [] }])))
       const reloadCatalog = async (key) => {
@@ -514,6 +763,60 @@ window.__ModuleLoader__.load({
         for (const key of ['dsh', 'codex', 'acp', 'agy']) reloadCatalog(key)
         return () => { for (const key of ['dsh', 'codex', 'acp', 'agy']) catalogGeneration.current[key] += 1 }
       }, [loadCatalogs])
+      useEffect(() => {
+        if (confirmClose && !wasConfirmClose.current) {
+          continueButtonRef.current?.focus?.()
+        } else if (!confirmClose && wasConfirmClose.current) {
+          if (typeof document !== 'undefined' && dialogRef?.current && !dialogRef.current.contains(document.activeElement)) {
+            ;(closeButtonRef?.current || dialogRef.current).focus?.()
+          }
+        }
+        wasConfirmClose.current = confirmClose
+      }, [confirmClose, dialogRef, closeButtonRef])
+
+      const editKeys = Object.keys(edits)
+      const hasEdits = snapshot.status === 'ready' && editKeys.length > 0
+      const attemptClose = ({ fromEscape = false } = {}) => {
+        if (saving.current || busy) return
+        if (!hasEdits) {
+          onClose?.()
+          return
+        }
+        if (confirmClose) {
+          if (fromEscape) setConfirmClose(false)
+          else continueButtonRef.current?.focus?.()
+          return
+        }
+        setConfirmClose(true)
+      }
+      if (attemptCloseRef) attemptCloseRef.current = attemptClose
+
+      const modalHeader = (extraBadge = null) => h('header', { className: 'ma-modal-header' },
+        h('div', { className: 'ma-modal-heading' },
+          h('div', { className: 'ma-modal-title-row' },
+            h('h2', { id: MODAL_TITLE_ID }, t('unified.title')),
+            extraBadge),
+          h('p', { id: MODAL_DESC_ID }, t('unified.description'))),
+        h('button', {
+          ref: closeButtonRef,
+          type: 'button',
+          name: 'modal-close',
+          className: 'ma-modal-close',
+          'aria-label': t('modal.closeAria'),
+          title: t('modal.close'),
+          onClick: () => attemptClose(),
+        }, h(CloseIcon)))
+
+      if (snapshot.status !== 'ready') {
+        return h('div', { className: 'ma-modal-form' },
+          modalHeader(null),
+          h('div', { className: 'ma-modal-status-body', role: 'status' },
+            t(snapshot.status === 'loading' ? 'common.loading' : 'common.unavailable')),
+          h('footer', { className: 'ma-modal-footer' },
+            h('div', { className: 'ma-actions' },
+              h('button', { type: 'button', name: 'modal-footer-close', onClick: () => attemptClose() }, t('modal.close')))))
+      }
+
       const value = baseline.current?.value || snapshot.value || {}
       const get = (field, fallback = '') => {
         if (Object.hasOwn(edits, field)) return edits[field]
@@ -524,6 +827,7 @@ window.__ModuleLoader__.load({
         if (saving.current || snapshot.status !== 'ready' || !snapshot.writable) return
         if (!baseline.current) baseline.current = snapshot
         setEdits((current) => ({ ...current, [field]: next }))
+        setConfirmClose(false)
         setResult('')
       }
       const discardEdit = (field) => {
@@ -539,30 +843,36 @@ window.__ModuleLoader__.load({
         baseline.current = null
         setSnapshot(form.getSnapshot())
         setEdits({})
+        setConfirmClose(false)
         setResult('')
       }
       const conflict = baseline.current !== null && baseline.current.revision !== snapshot.revision
       const disabled = busy || !snapshot.writable || conflict
       const save = async (event) => {
-        event.preventDefault()
+        event?.preventDefault?.()
+        setConfirmClose(false)
         const current = form.getSnapshot()
-        if (saving.current || Object.keys(edits).length === 0 || current.status !== 'ready' || !current.writable) return
+        if (saving.current || Object.keys(edits).length === 0 || current.status !== 'ready' || !current.writable) return false
         if (!baseline.current || baseline.current.revision !== current.revision) {
           setSnapshot(current)
           setResult('common.conflict')
-          return
+          return false
         }
         let operations
         try { operations = buildOperations(kind, edits) } catch (error) {
           setResult(error.code || 'common.failure')
-          return
+          if (error.field && activeSection !== 'all') {
+            const targetSection = sectionForField(error.field)
+            if (targetSection !== activeSection) setActiveSection(targetSection)
+          }
+          return false
         }
         saving.current = true
         setBusy(true)
         setResult('')
         try {
           const ok = await form.mutate(operations, baseline.current.revision)
-          if (!mounted.current) return
+          if (!mounted.current) return false
           const currentSnapshot = form.getSnapshot()
           if (ok) {
             baseline.current = null
@@ -571,17 +881,30 @@ window.__ModuleLoader__.load({
             const remaining = Object.fromEntries(Object.entries(edits).filter(([key]) => !form.savedFields.includes(key)))
             setEdits(remaining)
             baseline.current = currentSnapshot
+            const remainingKeys = Object.keys(remaining)
+            if (activeSection !== 'all' && remainingKeys.length > 0 && !remainingKeys.some((key) => sectionForField(key) === activeSection)) {
+              setActiveSection(sectionForField(remainingKeys[0]))
+            }
           }
           setSnapshot(currentSnapshot)
           setResult(ok ? 'common.success' : 'unified.partial')
+          return ok
         } catch {
           if (mounted.current) setResult('common.failure')
+          return false
         } finally {
           saving.current = false
           if (mounted.current) setBusy(false)
         }
       }
-      if (snapshot.status !== 'ready') return h('div', { className: 'ma-settings', role: 'status' }, h('style', null, CSS), t(snapshot.status === 'loading' ? 'common.loading' : 'common.unavailable'))
+      const saveAndClose = async () => {
+        const ok = await save()
+        if (ok && mounted.current) onClose?.()
+      }
+      const discardAndClose = () => {
+        reset()
+        onClose?.()
+      }
 
       const catalog = catalogs.dsh
       const dshProvider = get('dsh.defaultProvider', '')
@@ -596,10 +919,10 @@ window.__ModuleLoader__.load({
         const options = catalogs[owner].groups.flatMap((group) => group.models.map((model) => ({ ...model, provider: group.id })))
         const efforts = options.find((model) => model.id === get(`${owner}.model`, ''))?.reasoning?.efforts ?? []
         const available = snapshot.sections[owner]
-        return h('fieldset', { key: owner, className: 'ma-model-fields', disabled: !available },
+        return h('fieldset', { key: owner, className: 'ma-card', disabled: !available },
           h('h3', null, title),
           !available ? h('p', { role: 'status' }, t('unified.disabled')) : null,
-          h('div', { className: 'ma-fields' },
+          h('div', { className: 'ma-card-fields' },
             h(ModelField, { name: `${owner}.model`, label: t(`${owner}.model`), value: get(`${owner}.model`, ''), onChange: (next) => changeModel(`${owner}.model`, next), options, t }),
             h(ModelField, { name: `${owner}.reasoningEffort`, label: t('unified.effort'), placeholder: t('unified.effort'), value: get(`${owner}.reasoningEffort`, ''), onChange: (next) => change(`${owner}.reasoningEffort`, next), options: efforts, t }),
             h(Field, { name: `${owner}.command`, label: t(`${owner}.command`), placeholder: t('common.commandPlaceholder'), value: get(`${owner}.command`, ''), onChange: (next) => change(`${owner}.command`, next) })),
@@ -619,61 +942,259 @@ window.__ModuleLoader__.load({
           ...(policy === 'subagent' ? [h(Select, { name: modeField, label: t(`${owner}.subagentMode`), value: get(modeField, 'auto'), onChange: (next) => change(modeField, next), options: ['auto', 'full-access', 'ask-request'].map((value) => ({ value, label: t(`${owner}.subagentMode.${value}`) })) })] : []),
         ]
       }
-      const acpRuntimeCard = (owner, title) => h('fieldset', { disabled: !snapshot.sections[owner] },
-        h('h3', null, title),
-        h('div', { className: 'ma-fields' },
-          ...permissionPolicyFields(owner),
-          h(Field, { name: `${owner}.disposeEofGraceMs`, label: t(`${owner}.disposeEofGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeEofGraceMs`, 6000), onChange: (next) => change(`${owner}.disposeEofGraceMs`, next) }),
-          h(Field, { name: `${owner}.disposeGraceMs`, label: t(`${owner}.disposeGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeGraceMs`, 3000), onChange: (next) => change(`${owner}.disposeGraceMs`, next) })),
-        h(TextArea, { name: `${owner}.args`, className: 'ma-code', label: t(`${owner}.args`), value: getJson(`${owner}.args`, ['acp']), onChange: (next) => change(`${owner}.args`, next) }),
-        h('p', null, t(`${owner}.permissionWarning`)),
-        h(TextArea, { name: `${owner}.env`, className: 'ma-code', label: t(`${owner}.env`), value: getJson(`${owner}.env`, {}), onChange: (next) => change(`${owner}.env`, next) }),
-        h('p', null, t(`${owner}.envHint`)))
-      return h('form', { className: 'ma-settings', onSubmit: save, 'aria-label': t('unified.title') },
-        h('style', null, CSS),
-        h('header', null, h('h2', null, t('unified.title')), h('p', null, t('unified.description'))),
-        !snapshot.writable ? h('p', { role: 'status' }, t('common.readonly')) : null,
-        h('fieldset', { disabled },
-          h('section', { className: 'ma-section' },
-            h('h2', null, t('unified.models')),
-            h('p', null, t('unified.effortHint')),
-            h('div', { className: 'ma-model-fields' },
-              h('h3', null, 'DSH'),
-              h('div', { className: 'ma-fields' },
-                h(ModelField, { name: 'dsh.defaultProvider', label: t('router.dsh.defaultProvider'), value: dshProvider, onChange: (next) => { change('dsh.defaultProvider', next); changeModel('dsh.defaultModel', '') }, options: catalog.groups.map((group) => ({ id: group.id, name: group.name })), t }),
-                h(ModelField, { name: 'dsh.defaultModel', label: t('router.dsh.defaultModel'), value: get('dsh.defaultModel', ''), onChange: (next) => changeModel('dsh.defaultModel', next), options: dshModels, t }),
-                h(ModelField, { name: 'dsh.defaultReasoningEffort', label: t('unified.effort'), placeholder: t('unified.effort'), value: get('dsh.defaultReasoningEffort', ''), onChange: (next) => change('dsh.defaultReasoningEffort', next), options: dshEfforts, t })),
-              h(CatalogStatus, { catalog, onRetry: () => reloadCatalog('dsh'), t }),
-              h('p', null, t('router.modelHint'))),
-            externalModelCard('codex', 'Codex'), externalModelCard('acp', 'Kimi Code'), externalModelCard('agy', t('agy.title'))),
-          h('section', { className: 'ma-section' },
-            h('h2', null, t('router.policy')),
-            h('div', { className: 'ma-fields' },
-              h(Select, { name: 'selectionMode', label: t('router.selectionMode'), value: get('selectionMode', 'auto'), onChange: (next) => change('selectionMode', next), options: ['auto', 'ask-if-ambiguous', 'always-ask'].map((mode) => ({ value: mode, label: t(`router.selectionMode.${mode}`) })) }),
-              h(Select, { name: 'defaultAgent', label: t('router.defaultAgent'), value: get('defaultAgent', ''), onChange: (next) => change('defaultAgent', next), options: [{ value: '', label: t('router.noDefault') }, ...AGENT_OPTIONS] }),
-              h(Field, { name: 'timeoutSeconds', label: t('router.timeoutSeconds'), type: 'number', min: 1, max: 86400, step: 1, required: true, value: get('timeoutSeconds', 1800), onChange: (next) => change('timeoutSeconds', next) })),
-            h('h3', null, t('router.routes')), h('p', null, t('router.routesHint')),
-            h(RoutesEditor, { routes: get('routes', []), onChange: (next) => change('routes', next), t }),
-            h(TextArea, { name: 'additionalInstructions', label: t('router.additionalInstructions'), value: get('additionalInstructions', ''), onChange: (next) => change('additionalInstructions', next) }),
-            h(TextArea, { name: 'taskPreamble', label: t('router.taskPreamble'), value: get('taskPreamble', ''), onChange: (next) => change('taskPreamble', next) })),
-          h('section', { className: 'ma-section' },
-            h('h2', null, t('unified.runtime')),
-            h('fieldset', { disabled: !snapshot.sections.codex },
-              h('h3', null, 'Codex'),
-              h('div', { className: 'ma-fields' },
-                ...permissionPolicyFields('codex', 'permissionPolicy'),
-                h(Select, { name: 'codex.permissionMode', label: t('codex.permissionMode'), value: get('codex.permissionMode', 'approve-for-me'), onChange: (next) => change('codex.permissionMode', next), options: ['never', 'approve-for-me', 'dangerously-bypass-approvals-and-sandbox'].map((mode) => ({ value: mode, label: t(`codex.permissionMode.${mode}`) })) }),
-                h(Field, { name: 'codex.disposeGraceMs', label: t('codex.disposeGraceMs'), type: 'number', min: 1, max: 2147483647, step: 1, value: get('codex.disposeGraceMs', 3000), onChange: (next) => change('codex.disposeGraceMs', next) })),
-              h('p', null, t('codex.permissionWarning')),
-              h(TextArea, { name: 'codex.env', className: 'ma-code', label: t('codex.env'), value: getJson('codex.env', {}), onChange: (next) => change('codex.env', next) })),
-            acpRuntimeCard('acp', 'Kimi Code'), acpRuntimeCard('agy', t('agy.title')))),
-        h('div', { className: 'ma-actions' },
-          h('button', { type: 'submit', disabled: disabled || Object.keys(edits).length === 0 }, t(busy ? 'common.saving' : 'common.save')),
-          h('button', { type: 'button', disabled: busy || Object.keys(edits).length === 0, onClick: reset }, t('common.reset'))),
-        (conflict || result) && !busy ? h('p', {
-          role: result === 'common.failure' || result === 'common.conflict' || result.startsWith('common.invalid') || result === 'common.commandRequired' || result === 'agy.commandRequired' || result === 'common.routesRequired' || conflict ? 'alert' : 'status',
-          className: result === 'common.failure' || result === 'common.conflict' || result.startsWith('common.invalid') || result === 'common.commandRequired' || result === 'agy.commandRequired' || result === 'common.routesRequired' || conflict ? 'ma-error' : undefined,
-        }, t(conflict ? 'common.conflict' : result)) : null)
+      const acpRuntimeCard = (owner, title) => {
+        const available = snapshot.sections[owner]
+        return h('fieldset', { key: owner, className: 'ma-card', disabled: !available },
+          h('h3', null, title),
+          !available ? h('p', { role: 'status' }, t('unified.disabled')) : null,
+          h('div', { className: 'ma-fields' },
+            ...permissionPolicyFields(owner),
+            h(Field, { name: `${owner}.disposeEofGraceMs`, label: t(`${owner}.disposeEofGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeEofGraceMs`, 6000), onChange: (next) => change(`${owner}.disposeEofGraceMs`, next) }),
+            h(Field, { name: `${owner}.disposeGraceMs`, label: t(`${owner}.disposeGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeGraceMs`, 3000), onChange: (next) => change(`${owner}.disposeGraceMs`, next) })),
+          h('p', null, t(`${owner}.permissionWarning`)),
+          h('div', { className: 'ma-two-col' },
+            h(TextArea, { name: `${owner}.args`, className: 'ma-code', label: t(`${owner}.args`), value: getJson(`${owner}.args`, ['acp']), onChange: (next) => change(`${owner}.args`, next) }),
+            h('div', { className: 'ma-field' },
+              h(TextArea, { name: `${owner}.env`, className: 'ma-code', label: t(`${owner}.env`), value: getJson(`${owner}.env`, {}), onChange: (next) => change(`${owner}.env`, next) }),
+              h('p', null, t(`${owner}.envHint`)))))
+      }
+
+      const dirtySections = new Set(editKeys.map(sectionForField))
+      const navSections = [
+        { id: 'all', label: t('modal.nav.all'), dirty: hasEdits },
+        { id: 'models', label: t('modal.nav.models'), dirty: dirtySections.has('models') },
+        { id: 'policy', label: t('modal.nav.policy'), dirty: dirtySections.has('policy') },
+        { id: 'runtime', label: t('modal.nav.runtime'), dirty: dirtySections.has('runtime') },
+      ]
+      const providerStatuses = [
+        { id: 'router', label: 'DSH' },
+        { id: 'codex', label: 'Codex' },
+        { id: 'acp', label: 'Kimi Code' },
+        { id: 'agy', label: 'Antigravity (agy)' },
+      ]
+      const statusBadge = hasEdits
+        ? h('span', { className: 'ma-badge', 'data-tone': 'warn' }, t('modal.unsavedBadge'))
+        : !snapshot.writable
+          ? h('span', { className: 'ma-badge', 'data-tone': 'idle' }, t('modal.statusReadonly'))
+          : null
+      const showModels = activeSection === 'all' || activeSection === 'models'
+      const showPolicy = activeSection === 'all' || activeSection === 'policy'
+      const showRuntime = activeSection === 'all' || activeSection === 'runtime'
+      const isAlertResult = result === 'common.failure' || result === 'common.conflict' || result.startsWith('common.invalid') || result === 'common.commandRequired' || result === 'agy.commandRequired' || result === 'common.routesRequired' || conflict
+
+      return h('form', { className: 'ma-modal-form', onSubmit: save, 'aria-label': t('unified.title') },
+        modalHeader(statusBadge),
+        confirmClose ? h('div', { className: 'ma-unsaved-banner', role: 'alertdialog', 'aria-label': t('modal.unsavedTitle') },
+          h('span', { className: 'ma-unsaved-copy' }, t('modal.unsavedConfirm')),
+          h('div', { className: 'ma-unsaved-actions' },
+            h('button', {
+              ref: continueButtonRef,
+              type: 'button',
+              name: 'modal-continue-editing',
+              onClick: () => setConfirmClose(false),
+            }, t('modal.continueEditing')),
+            h('button', {
+              type: 'button',
+              name: 'modal-save-and-close',
+              className: 'ma-btn-primary',
+              disabled: disabled || !hasEdits,
+              onClick: saveAndClose,
+            }, t('modal.saveAndClose')),
+            h('button', {
+              type: 'button',
+              name: 'modal-discard-and-close',
+              disabled: busy,
+              onClick: discardAndClose,
+            }, t('modal.discardAndClose')))) : null,
+        h('div', { className: 'ma-modal-body' },
+          h('nav', { className: 'ma-modal-nav', 'aria-label': t('modal.navAria') },
+            h('div', { className: 'ma-nav-list' },
+              navSections.map((section) => h('button', {
+                key: section.id,
+                type: 'button',
+                name: `nav-${section.id}`,
+                className: 'ma-nav-btn',
+                'aria-pressed': activeSection === section.id,
+                onClick: () => setActiveSection(section.id),
+              },
+              h('span', null, section.label),
+              section.dirty ? h('span', { className: 'ma-dirty-dot', 'aria-hidden': true }) : null))),
+            h('div', { className: 'ma-provider-list' },
+              h('p', { className: 'ma-provider-list-title' }, t('modal.statusHeading')),
+              providerStatuses.map((item) => {
+                const ready = snapshot.availability ? snapshot.availability[item.id] : (item.id === 'router' ? snapshot.status === 'ready' : snapshot.sections[item.id])
+                const writable = snapshot.sections[item.id]
+                const tone = !ready ? 'idle' : writable ? 'ready' : 'idle'
+                const label = !ready ? t('modal.statusUnavailable') : writable ? t('modal.statusAvailable') : t('modal.statusReadonly')
+                return h('div', { key: item.id, className: 'ma-provider-item' },
+                  h('span', { className: 'ma-provider-item-name' }, item.label),
+                  h('span', { className: 'ma-badge', 'data-tone': tone }, label))
+              }))),
+          h('div', { className: 'ma-modal-scroll' },
+            h('div', { className: 'ma-settings' },
+              !snapshot.writable ? h('p', { className: 'ma-readonly-banner', role: 'status' }, t('common.readonly')) : null,
+              h('fieldset', { className: 'ma-outer-fieldset', disabled },
+                showModels ? h('section', { className: 'ma-section', 'aria-label': t('unified.models') },
+                  h('div', { className: 'ma-section-head' },
+                    h('h2', null, t('unified.models')),
+                    h('p', null, t('modal.modelsDescription')),
+                    h('p', null, t('unified.effortHint'))),
+                  h('div', { className: 'ma-model-grid' },
+                    h('div', { className: 'ma-card' },
+                      h('h3', null, 'DSH'),
+                      h('div', { className: 'ma-card-fields' },
+                        h(ModelField, { name: 'dsh.defaultProvider', label: t('router.dsh.defaultProvider'), value: dshProvider, onChange: (next) => { change('dsh.defaultProvider', next); changeModel('dsh.defaultModel', '') }, options: catalog.groups.map((group) => ({ id: group.id, name: group.name })), t }),
+                        h(ModelField, { name: 'dsh.defaultModel', label: t('router.dsh.defaultModel'), value: get('dsh.defaultModel', ''), onChange: (next) => changeModel('dsh.defaultModel', next), options: dshModels, t }),
+                        h(ModelField, { name: 'dsh.defaultReasoningEffort', label: t('unified.effort'), placeholder: t('unified.effort'), value: get('dsh.defaultReasoningEffort', ''), onChange: (next) => change('dsh.defaultReasoningEffort', next), options: dshEfforts, t })),
+                      h(CatalogStatus, { catalog, onRetry: () => reloadCatalog('dsh'), t }),
+                      h('p', null, t('router.modelHint'))),
+                    externalModelCard('codex', 'Codex'),
+                    externalModelCard('acp', 'Kimi Code'),
+                    externalModelCard('agy', t('agy.title')))) : null,
+                showPolicy ? h('section', { className: 'ma-section', 'aria-label': t('router.policy') },
+                  h('div', { className: 'ma-section-head' },
+                    h('h2', null, t('router.policy')),
+                    h('p', null, t('modal.policyDescription'))),
+                  h('div', { className: 'ma-fields' },
+                    h(Select, { name: 'selectionMode', label: t('router.selectionMode'), value: get('selectionMode', 'auto'), onChange: (next) => change('selectionMode', next), options: ['auto', 'ask-if-ambiguous', 'always-ask'].map((mode) => ({ value: mode, label: t(`router.selectionMode.${mode}`) })) }),
+                    h(Select, { name: 'defaultAgent', label: t('router.defaultAgent'), value: get('defaultAgent', ''), onChange: (next) => change('defaultAgent', next), options: [{ value: '', label: t('router.noDefault') }, ...AGENT_OPTIONS] }),
+                    h(Field, { name: 'timeoutSeconds', label: t('router.timeoutSeconds'), type: 'number', min: 1, max: 86400, step: 1, required: true, value: get('timeoutSeconds', 1800), onChange: (next) => change('timeoutSeconds', next) })),
+                  h('div', { className: 'ma-section-head' },
+                    h('h3', null, t('router.routes')),
+                    h('p', null, t('router.routesHint'))),
+                  h(RoutesEditor, { routes: get('routes', []), onChange: (next) => change('routes', next), t }),
+                  h('div', { className: 'ma-two-col' },
+                    h(TextArea, { name: 'additionalInstructions', label: t('router.additionalInstructions'), value: get('additionalInstructions', ''), onChange: (next) => change('additionalInstructions', next) }),
+                    h(TextArea, { name: 'taskPreamble', label: t('router.taskPreamble'), value: get('taskPreamble', ''), onChange: (next) => change('taskPreamble', next) }))) : null,
+                showRuntime ? h('section', { className: 'ma-section', 'aria-label': t('unified.runtime') },
+                  h('div', { className: 'ma-section-head' },
+                    h('h2', null, t('unified.runtime')),
+                    h('p', null, t('modal.runtimeDescription'))),
+                  h('div', { className: 'ma-runtime-grid' },
+                    h('fieldset', { className: 'ma-card', disabled: !snapshot.sections.codex },
+                      h('h3', null, 'Codex'),
+                      !snapshot.sections.codex ? h('p', { role: 'status' }, t('unified.disabled')) : null,
+                      h('div', { className: 'ma-fields' },
+                        ...permissionPolicyFields('codex', 'permissionPolicy'),
+                        h(Select, { name: 'codex.permissionMode', label: t('codex.permissionMode'), value: get('codex.permissionMode', 'approve-for-me'), onChange: (next) => change('codex.permissionMode', next), options: ['never', 'approve-for-me', 'dangerously-bypass-approvals-and-sandbox'].map((mode) => ({ value: mode, label: t(`codex.permissionMode.${mode}`) })) }),
+                        h(Field, { name: 'codex.disposeGraceMs', label: t('codex.disposeGraceMs'), type: 'number', min: 1, max: 2147483647, step: 1, value: get('codex.disposeGraceMs', 3000), onChange: (next) => change('codex.disposeGraceMs', next) })),
+                      h('p', null, t('codex.permissionWarning')),
+                      h(TextArea, { name: 'codex.env', className: 'ma-code', label: t('codex.env'), value: getJson('codex.env', {}), onChange: (next) => change('codex.env', next) })),
+                    acpRuntimeCard('acp', 'Kimi Code'),
+                    acpRuntimeCard('agy', t('agy.title')))) : null)))),
+        h('footer', { className: 'ma-modal-footer' },
+          h('div', { className: 'ma-footer-status' },
+            (conflict || result) && !busy ? h('p', {
+              role: isAlertResult ? 'alert' : 'status',
+              className: isAlertResult ? 'ma-error' : result === 'common.success' ? 'ma-success' : undefined,
+            }, t(conflict ? 'common.conflict' : result))
+              : hasEdits ? h('p', { role: 'status' }, t('modal.unsavedBadge')) : null),
+          h('div', { className: 'ma-actions' },
+            h('button', { type: 'button', name: 'discard-edits', disabled: busy || !hasEdits, onClick: reset }, t('common.reset')),
+            h('button', { type: 'submit', name: 'save-changes', className: 'ma-btn-primary', disabled: disabled || !hasEdits }, t(busy ? 'common.saving' : 'common.save')))))
+    }
+
+    function DispatchOverlay({ store, form, loadCatalogs, t }) {
+      const open = useDispatchModalOpen(store)
+      const wasOpen = useRef(false)
+      const triggerRef = useRef(null)
+      const dialogRef = useRef(null)
+      const closeButtonRef = useRef(null)
+      const attemptCloseRef = useRef(() => store.close())
+      const backdropMouseDown = useRef(null)
+
+      useEffect(() => {
+        if (open && !wasOpen.current) {
+          triggerRef.current = store.getTrigger() || (typeof document !== 'undefined' ? document.activeElement : null)
+        } else if (!open && wasOpen.current) {
+          const target = triggerRef.current
+          triggerRef.current = null
+          store.clearTrigger()
+          if (target && typeof target.focus === 'function' && target.isConnected !== false) {
+            target.focus()
+          }
+        }
+        wasOpen.current = open
+      }, [open, store])
+
+      useEffect(() => {
+        if (!open) {
+          attemptCloseRef.current = () => store.close()
+          return undefined
+        }
+        const dialog = dialogRef.current
+        ;(closeButtonRef.current || firstFocusable(dialog) || dialog)?.focus?.()
+
+        if (typeof document === 'undefined') return undefined
+        const onKeyDown = (event) => {
+          if (event.defaultPrevented || event.isComposing) return
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
+            attemptCloseRef.current({ fromEscape: true })
+            return
+          }
+          if (event.key === 'Tab') {
+            trapTabInDialog(dialogRef.current, event)
+          }
+        }
+        const onFocusIn = (event) => {
+          const currentDialog = dialogRef.current
+          if (!currentDialog || typeof currentDialog.contains !== 'function') return
+          if (!currentDialog.contains(event.target)) {
+            ;(firstFocusable(currentDialog) || currentDialog).focus?.()
+          }
+        }
+        document.addEventListener('keydown', onKeyDown)
+        document.addEventListener('focusin', onFocusIn)
+        return () => {
+          document.removeEventListener('keydown', onKeyDown)
+          document.removeEventListener('focusin', onFocusIn)
+        }
+      }, [open, store])
+
+      if (!open) return null
+
+      return h('div', {
+        className: 'ma-overlay-backdrop',
+        onMouseDown: (event) => { backdropMouseDown.current = event.target === event.currentTarget },
+        onClick: (event) => {
+          const allowClose = backdropMouseDown.current !== false
+          backdropMouseDown.current = null
+          if (allowClose && event.target === event.currentTarget) {
+            attemptCloseRef.current()
+          }
+        },
+      },
+      h('style', null, MODAL_CSS),
+      h('div', {
+        ref: dialogRef,
+        className: 'ma-modal',
+        role: 'dialog',
+        'aria-modal': true,
+        'aria-labelledby': MODAL_TITLE_ID,
+        'aria-describedby': MODAL_DESC_ID,
+        tabIndex: -1,
+        onKeyDown: (event) => {
+          if (event.defaultPrevented || event.isComposing) return
+          if (event.key === 'Escape') {
+            event.preventDefault?.()
+            event.stopPropagation?.()
+            attemptCloseRef.current({ fromEscape: true })
+          } else if (event.key === 'Tab') {
+            trapTabInDialog(dialogRef.current, event)
+          }
+        },
+      },
+      h(ConfigForm, {
+        form,
+        loadCatalogs,
+        t,
+        onClose: () => store.close(),
+        dialogRef,
+        closeButtonRef,
+        attemptCloseRef,
+      })))
     }
 
     async function loadExternalCatalog(kind) {
@@ -688,6 +1209,8 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, DICT), 'multi-agent: dictionaries')
         const t = ctx.locale.bind(NS)
+        const store = createDispatchModalStore()
+        ctx.effect(() => () => store.dispose(), 'multi-agent: dispatch modal store')
         const form = combinedForm({
           router: ctx.configForms.get('multi-agent-router'),
           codex: ctx.configForms.get('codex-provider'),
@@ -704,11 +1227,19 @@ window.__ModuleLoader__.load({
           acp: () => loadExternalCatalog('kimi-code'),
           agy: () => loadExternalCatalog('agy'),
         }
-        ctx.slots.inject('settings.section', () => ctx.slots.register({
-          name: 'settings.section', id: 'multi-agent-dispatch', order: 12,
-          locale: NS, label: () => t('unified.title'),
-          inject: () => ({ form, loadCatalogs }),
-        }, ConfigForm))
+        ctx.effect(() => ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+          name: 'conversation.session.header.utilities',
+          id: 'multi-agent-dispatch',
+          order: 30,
+          locale: NS,
+          label: () => t('unified.title'),
+        }, (props) => h(HeaderDispatchButton, { ...props, store, t: props?.t || t }))), 'multi-agent: header utility button')
+        ctx.effect(() => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+          name: 'shell.overlay',
+          id: 'multi-agent-dispatch',
+          order: 30,
+          locale: NS,
+        }, (props) => h(DispatchOverlay, { ...props, store, form, loadCatalogs, t: props?.t || t }))), 'multi-agent: settings overlay')
       },
     }
   })(require);

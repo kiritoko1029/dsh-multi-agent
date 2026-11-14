@@ -2,7 +2,14 @@
 
 把独立任务按自然语言规则派发给 **DSH 自身、Codex、Kimi Code 或 Antigravity（agy）**，并通过 DSH 原生子代理完成通知把结果送回主会话。
 
-## 0.9.0：子代理权限申请（主会话审批）
+## 0.9.2：顶栏多 Agent 设置面板
+
+- 会话顶栏右侧新增“多 Agent 派发”小按钮，点击后在宽敞浮层中完成全部配置，不再进入 DSH 设置页。
+- 面板按“全部”“模型与思考强度”“派发策略与规则”“运行参数”分组，保留 DSH、Codex、Kimi Code 与 Antigravity（agy）的模型、路由、权限和运行配置。
+- 保留四个 Config namespace 的独立 revision / CAS 保存与部分失败处理；支持未保存关闭确认、Escape、遮罩关闭、焦点圈定和中英文界面。
+- 原 DSH 设置页入口已移除；已有配置值保持不变，无需手工迁移。
+
+### 0.9.0：子代理权限申请（主会话审批）
 
 子代理的权限申请不再一律拒绝。每个 Agent（Kimi、agy、Codex）都有独立的"子代理权限请求策略"，默认 **主会话审批**：
 
@@ -49,7 +56,7 @@ Windows 下请填写实际原生程序（通常为 `.exe`）的绝对路径。�
 
 当前 macOS 上完成了模拟 Windows 路径、真实 Loader 生命周期和完整回归验证。实际 Windows CLI 的模型目录读取仍应在接收者电脑验收，不能把模拟路径测试描述为 Windows 端到端通过。
 
-这是 `dsh-multi-agent` 0.9.0 的发布说明。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)，安装包从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载，未发布到 npm。首次安装请先阅读 [安装与安全说明](INSTALL.zh.md)，版本变更见 [更新日志](CHANGELOG.md)。
+这是 `dsh-multi-agent` 0.9.2 的发布说明。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)，安装包从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载，未发布到 npm。首次安装请先阅读 [安装与安全说明](INSTALL.zh.md)，版本变更见 [更新日志](CHANGELOG.md)。
 
 - Kimi / agy 命令从接收者自己的用户目录与 PATH 检测，不含打包者的本机路径。
 - Kimi / agy 新安装默认 `permission: main-session`：权限申请送主会话审批；0.8.x 保存的 `allow` / `reject` 值继续有效。批准操作可能允许写文件与执行命令，这不是操作系统级只读沙箱。
@@ -144,7 +151,7 @@ DSH Subagent Manager
 
 ## 设置
 
-打开 **DSH 设置 → 多 Agent 派发**。从 0.3.0 起，三个组件的配置统一迁移到这个入口，插件详情中的独立配置入口已移除（组件启停仍由插件管理器负责）。页面顶部集中配置 DSH、Codex、Kimi 和 Antigravity（agy）的模型与思考强度，下面是路由和运行参数。
+打开会话顶栏右侧的 **多 Agent 派发** 小按钮，在弹出的宽敞面板中完成全部配置。三个组件的配置统一迁移到这个入口，DSH 设置页与插件详情中的独立配置入口不再提供这些字段（组件启停仍由插件管理器负责）。面板按“模型与思考强度”“派发策略与规则”“运行参数”分组，集中配置 DSH、Codex、Kimi 和 Antigravity（agy）。
 
 底层保留原有三个配置项及其保存值，无需重填或手工迁移。统一“保存更改”逐项调用 DSH 原生配置通道，每项均带 revision 冲突保护；这些写入不是跨组件事务。部分保存失败时保留失败项的编辑，不重复提交已成功的项。更改应用于后续派发，已运行的任务不受影响。
 
@@ -163,14 +170,14 @@ DSH Subagent Manager
 - `additionalInstructions`：补充路由偏好，例如“用户明确点名时优先”。
 - `taskPreamble`：附加到每个子任务的通用要求，例如代码规范或回复语言。
 - `timeoutSeconds`：单次任务墙钟超时，默认 1800 秒，覆盖启动握手与执行阶段；超时由 DSH 取消 activation，并按 `aborted` 结算，不是 CLI 退出码。
-- `dsh.defaultProvider` / `dsh.defaultModel`：位于配置页顶部的 DSH 默认模型路由；留空继承主会话。通过 `remote.session.modelCatalog()` 读取实际 provider/model 建议，provider 变化时过滤模型列表，也可手动输入。
+- `dsh.defaultProvider` / `dsh.defaultModel`：位于“模型与思考强度”分组的 DSH 默认模型路由；留空继承主会话。通过 `remote.session.modelCatalog()` 读取实际 provider/model 建议，provider 变化时过滤模型列表，也可手动输入。
 - `dsh.defaultReasoningEffort`：DSH 子代理默认推理强度；选中模型后显示该模型实际支持的 effort 建议，留空使用模型默认值。
 
 高级字段 `codex` / `kimiCode` / `agy` / `dsh`（Provider 名、显示名、说明和启用状态）保留在 Cordis 配置中，默认分别绑定 `codex-router`、`kimi-code`、`agy` 与 `spawn`，一般无需修改。
 
 ### Codex Provider
 
-- `model`：位于统一设置页顶部的默认 Codex 模型；通过可用性检测到的本机当前 Codex CLI 执行 `debug models`（不使用 `--bundled` 静态快照），读取与交互 `/models` 一致的公开模型（`visibility: list`），可下拉选择或手动输入；留空使用 Codex 原生配置，后续每次启动都会读取最新值。
+- `model`：位于顶栏“多 Agent 派发”面板顶部的默认 Codex 模型；通过可用性检测到的本机当前 Codex CLI 执行 `debug models`（不使用 `--bundled` 静态快照），读取与交互 `/models` 一致的公开模型（`visibility: list`），可下拉选择或手动输入；留空使用 Codex 原生配置，后续每次启动都会读取最新值。
 - `reasoningEffort`：默认思考强度；建议取自 Codex 目录的 `supported_reasoning_levels`，执行时明确发送到 app-server 的 `turn/start.effort`。留空时不覆盖原生默认值。
 - `permissionPolicy`：子代理权限请求策略，默认 `main-session`。主会话审批 / 人工审批 / 允许所有时线程使用 ask-request 参数（无自动审查器），真实升级请求按策略决定；拒绝所有与子代理控制的 `auto` 沿用下方 `permissionMode`。
 - `subagentPermissionMode`：子代理控制等级（`auto` / `full-access` / `ask-request`），仅策略为 `subagent` 时生效，映射到 Codex 原生线程模式。
@@ -180,7 +187,7 @@ DSH Subagent Manager
 
 ### Kimi Code ACP
 
-- `model`：位于统一设置页顶部的默认 Kimi 模型别名；通过 `kimi provider list --json` 读取实际配置别名与显示名，可下拉选择或手动输入；留空使用 Kimi 原生配置。设置时在 ACP `session/new` 成功后、`session/prompt` 前调用 `session/set_config_option`。
+- `model`：位于顶栏“多 Agent 派发”面板顶部的默认 Kimi 模型别名；通过 `kimi provider list --json` 读取实际配置别名与显示名，可下拉选择或手动输入；留空使用 Kimi 原生配置。设置时在 ACP `session/new` 成功后、`session/prompt` 前调用 `session/set_config_option`。
 
 - `reasoningEffort`：默认思考强度；建议取自模型的 `supportEfforts`。模型设置成功后，按会话最新返回的 `thinking` 选项验证并设置强度；不支持的值会在发送任务前报错，不会静默忽略。
 - `command` / `args`：默认 `<本机 kimi 路径> acp`。
@@ -196,9 +203,9 @@ DSH Subagent Manager
 
 ### Antigravity（agy）ACP（0.7.0）
 
-在统一设置页配置 **Antigravity（agy）**。它有独立的模型、思考强度和运行参数，不会覆盖 Kimi 的 ACP 配置。
+在顶栏“多 Agent 派发”面板配置 **Antigravity（agy）**。它有独立的模型、思考强度和运行参数，不会覆盖 Kimi 的 ACP 配置。
 
-- `command` / `args`：使用本机自动检测到的 agy 路径和 `["acp"]`；可在设置中修改命令，特殊安装位置需同步设置 `AGY_COMMAND`，供 DSH 启动时检测。
+- `command` / `args`：使用本机自动检测到的 agy 路径和 `["acp"]`；可在顶栏面板中修改命令，特殊安装位置需同步设置 `AGY_COMMAND`，供 DSH 启动时检测。
 - `model` / `reasoningEffort`：留空沿用原生默认值；指定后通过 ACP 会话配置设置。思考强度使用 agy 的 `thought_level`，与 Kimi 的 `thinking` 分开处理。不要把普通 CLI 的 `--model` / `--effort` 直接追加到 `agy acp` 参数。
 - 模型建议来自 `GET /multi-agent/model-catalog/agy`：通过短暂 ACP 会话读取实际模型族及各模型支持的强度，15 秒超时并回收进程，不执行任务 prompt。不要把 `agy models` 中带强度后缀的组合 ID 当作模型族填写。可选模型以当前账号和 ACP 返回值为准。
 - `permission`：子代理权限请求策略，默认 `main-session`（主会话审批），选项与 Kimi 相同（`main-session` / `human` / `allow` / `reject` / `subagent`）。
@@ -220,7 +227,7 @@ DSH Subagent Manager
 ## 本机可用性与回退
 
 - 插件挂载时检测本机原生 `codex`、`kimi` 与 `agy`。Kimi / agy 没有检测到命令且未手动配置时不注册 Provider；Codex 还可使用依赖包内的原生二进制，不再要求 PATH 中必须存在外部命令。
-- 可用 `CODEX_COMMAND`、`KIMI_COMMAND`、`AGY_COMMAND` 指定检测路径；也可在统一设置页手动覆盖。Kimi 默认检测 `~/.kimi-code/bin/kimi`，agy 在 POSIX 检测 `~/.local/bin/agy`、在 Windows 检测 `%LOCALAPPDATA%\agy\bin\agy.exe`。手动命令与 Provider `env` 同时用于目录查询和任务。
+- 可用 `CODEX_COMMAND`、`KIMI_COMMAND`、`AGY_COMMAND` 指定检测路径；也可在顶栏“多 Agent 派发”面板手动覆盖。Kimi 默认检测 `~/.kimi-code/bin/kimi`，agy 在 POSIX 检测 `~/.local/bin/agy`、在 Windows 检测 `%LOCALAPPDATA%\agy\bin\agy.exe`。手动命令与 Provider `env` 同时用于目录查询和任务。
 - 运行期间若选中的 Codex/Kimi/agy Provider 不可用，`dispatch_agent` 自动回退到本机 DSH，并在结果中返回 `route: "fallback"`；不会把外部 Agent 不可用静默当成任务成功。
 - DSH 子代理不依赖外部 CLI，始终作为本机兜底。模型选择仍遵守当前 Session 的模型授权和能力校验。
 - 新安装外部 CLI 后需要重载插件或重启 DSH，让 Loader 重新计算组件可用性。

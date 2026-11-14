@@ -2,6 +2,32 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
+## [0.9.2] - 2026-11-14
+
+### 新增
+
+- 会话顶栏右侧新增“多 Agent 派发”小按钮，通过 `shell.overlay` 打开宽约 1180px、高约 85vh 的设置浮层，并带小屏尺寸约束。
+- 面板按“全部”“模型与思考强度”“派发策略与规则”“运行参数”分组，集中管理 DSH、Codex、Kimi Code 和 Antigravity（agy）的模型、思考强度、路由、权限与运行配置。
+- 支持未保存修改关闭确认、Escape 与遮罩关闭、焦点圈定和焦点恢复，并提供中英文界面。
+
+### 变更
+
+- 移除 DSH 设置页中的旧“多 Agent 派发”入口；保留四个 Config namespace 的已有配置值、独立 revision / CAS 保存及部分失败处理，无需迁移设置。
+- 更新 README、安装与分享文档，统一说明新的顶栏入口。
+
+### 修复
+
+- 使用宿主实际提供的主题 token，以 `color-mix(...)` 和 `--dsw-alias-brand-primary` 替代不存在的 `--dsw-alias-brand-primary-soft`。
+
+### 已知限制
+
+- 主会话设为“不再询问”（`never`）时，走 `main-session` 的子代理审批会按 fail-closed 语义拒绝；当前审批结果未区分策略自动拒绝与用户主动拒绝，本版没有放宽权限或改变该语义。
+
+### 测试
+
+- 新增顶栏 Slot 注册、面板分组、焦点与关闭行为、主题约束及 CAS 保存等 Client 测试。
+- `npm run check` 通过；`npm test` 共 371 项，370 通过、0 失败、1 项原有条件跳过；`npm run build` 与 `git diff --check` 通过。
+
 ## [0.9.1] - 2026-11-13
 
 ### 修复
@@ -168,10 +194,14 @@
 
 ## 链接
 
+- [0.9.2 发布页][0.9.2]
+- [0.9.1 发布页][0.9.1]
 - [0.9.0 发布页][0.9.0]
 - [Keep a Changelog]
 - [语义化版本]
 
+[0.9.2]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.2
+[0.9.1]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.0
 [Keep a Changelog]: https://keepachangelog.com/zh-CN/1.1.0/
 [语义化版本]: https://semver.org/lang/zh-CN/

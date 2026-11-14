@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 
+const clientSource = readFileSync(new URL('../client.js', import.meta.url), 'utf8')
+
 const values = {
   router: { selectionMode: 'auto', timeoutSeconds: 1800, dsh: { defaultProvider: 'magpie', defaultModel: 'kimi/k3.1-pro', defaultReasoningEffort: 'high' }, routes: [{ agent: 'codex', prompt: 'Debug code.' }, { agent: 'kimi-code', prompt: 'Build UI.' }] },
   codex: { model: 'gpt-test', reasoningEffort: 'high', permissionMode: 'approve-for-me', env: {}, disposeGraceMs: 3000 },
@@ -17,26 +19,260 @@ const catalogs = {
   agy: { groups: [{ id: 'agy', name: 'Antigravity', models: [model('agy/gemini-test', ['low', 'high'])] }], failures: [] },
 }
 
+const FOCUSABLE_TAGS = new Set(['a', 'button', 'input', 'select', 'textarea', 'summary'])
+
+function isFocusableNode(type, props) {
+  if (props?.disabled) return false
+  if (type === 'a') return typeof props?.href === 'string'
+  if (FOCUSABLE_TAGS.has(type)) return true
+  return typeof props?.tabIndex === 'number' && props.tabIndex >= 0
+}
+
+function createReactRuntime() {
+  let active
+  let typeSequence = 0
+  const typeIds = new WeakMap()
+  const typeId = (type) => {
+    if (!typeIds.has(type)) typeIds.set(type, ++typeSequence)
+    return typeIds.get(type)
+  }
+  const React = {
+    createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
+    useState: (...args) => active.api.useState(...args),
+    useRef: (...args) => active.api.useRef(...args),
+    useEffect: (...args) => active.api.useEffect(...args),
+  }
+
+  function createDocument() {
+    const listeners = { keydown: new Set(), focusin: new Set() }
+    return {
+      activeElement: null,
+      listeners,
+      addEventListener(type, fn) {
+        listeners[type] ??= new Set()
+        listeners[type].add(fn)
+      },
+      removeEventListener(type, fn) {
+        listeners[type]?.delete(fn)
+      },
+      dispatch(type, event) {
+        for (const fn of [...(listeners[type] || [])]) fn(event)
+      },
+    }
+  }
+
+  function mountSlots(slots, doc) {
+    let disposed = false
+    let pendingEffects = []
+    let renderTrees = {}
+    const instances = new Map()
+    const hostNodes = new Map()
+    const hostRefs = new Map()
+    const focusHistory = []
+    const same = (left, right) => left && right && left.length === right.length && left.every((value, index) => Object.is(value, right[index]))
+
+    const disposeRecord = (record) => {
+      if (record.disposed) return
+      record.disposed = true
+      for (const cell of record.cells) {
+        cell?.cleanup?.()
+        if (cell) cell.cleanup = undefined
+      }
+    }
+
+    const assignRef = (ref, value) => {
+      if (typeof ref === 'function') ref(value)
+      else if (ref && typeof ref === 'object') ref.current = value
+    }
+
+    const makeHostNode = (path) => ({
+      path,
+      name: '',
+      isConnected: true,
+      focusable: false,
+      disabled: false,
+      insideHidden: false,
+      focus() {
+        focusHistory.push(this)
+        doc.activeElement = this
+      },
+      contains(target) {
+        if (!target) return false
+        if (target === this) return true
+        return typeof target.path === 'string' && target.path.startsWith(`${this.path}/`)
+      },
+      closest() { return null },
+      querySelectorAll() {
+        return [...hostNodes.values()].filter((node) =>
+          node !== this &&
+          node.path.startsWith(`${this.path}/`) &&
+          node.focusable &&
+          !node.disabled &&
+          !node.insideHidden
+        )
+      },
+    })
+
+    const api = {
+      useState(initial) {
+        const { record } = active
+        const index = active.cursor++
+        if (!(index in record.cells)) record.cells[index] = { value: typeof initial === 'function' ? initial() : initial }
+        return [record.cells[index].value, (next) => {
+          if (disposed || record.disposed) return
+          record.cells[index].value = typeof next === 'function' ? next(record.cells[index].value) : next
+        }]
+      },
+      useRef(initial) {
+        const index = active.cursor++
+        const cells = active.record.cells
+        if (!(index in cells)) cells[index] = { value: { current: initial } }
+        return cells[index].value
+      },
+      useEffect(effect, deps) {
+        const index = active.cursor++
+        const cells = active.record.cells
+        const previous = cells[index]
+        if (!previous || !same(previous.deps, deps)) {
+          pendingEffects.push({ record: active.record, index, effect, deps, previous })
+          cells[index] = { deps, cleanup: previous?.cleanup }
+        }
+      },
+    }
+
+    function renderAll(slotProps = {}) {
+      if (disposed) return renderTrees
+      pendingEffects = []
+      const seen = new Set()
+      const currentHosts = new Map()
+      const currentRefs = new Map()
+
+      const expand = (node, path, inheritedDisabled = false, inheritedHidden = false) => {
+        if (node === null || node === undefined || typeof node === 'boolean') return node
+        if (typeof node !== 'object') return node
+        const key = node.props?.key ?? ''
+        if (typeof node.type === 'function') {
+          const id = `${path}/c-${typeId(node.type)}:${key}`
+          let record = instances.get(id)
+          if (!record) {
+            record = { cells: [], disposed: false }
+            instances.set(id, record)
+          }
+          seen.add(id)
+          const previousActive = active
+          active = { record, api, cursor: 0 }
+          const rendered = node.type({ ...node.props, ...(node.children.length ? { children: node.children } : {}) })
+          active = previousActive
+          return expand(rendered, id, inheritedDisabled, inheritedHidden)
+        }
+        const hostPath = `${path}/h-${node.type}:${key}`
+        const disabled = inheritedDisabled || node.props?.disabled === true
+        const insideHidden = inheritedHidden || node.props?.hidden === true
+        const focusable = isFocusableNode(node.type, { ...node.props, disabled })
+        currentHosts.set(hostPath, {
+          name: node.props?.name || node.props?.className || node.type,
+          focusable,
+          disabled,
+          insideHidden,
+        })
+        if (node.props?.ref) currentRefs.set(hostPath, { ref: node.props.ref })
+        return {
+          ...node,
+          children: (node.children || []).map((child, index) =>
+            expand(child, `${hostPath}/${index}`, node.type === 'fieldset' ? disabled : inheritedDisabled, insideHidden)
+          ),
+        }
+      }
+
+      const nextTrees = {}
+      for (const [slotKey, entry] of Object.entries(slots)) {
+        const extra = slotProps[slotKey] || {}
+        nextTrees[slotKey] = expand(React.createElement(entry.component, extra), `slot:${slotKey}`)
+      }
+      renderTrees = nextTrees
+
+      for (const [id, record] of instances) {
+        if (seen.has(id)) continue
+        disposeRecord(record)
+        instances.delete(id)
+      }
+      for (const [path, node] of hostNodes) {
+        if (currentHosts.has(path)) continue
+        node.isConnected = false
+        hostNodes.delete(path)
+      }
+      for (const [path, info] of currentHosts) {
+        let node = hostNodes.get(path)
+        if (!node) {
+          node = makeHostNode(path)
+          hostNodes.set(path, node)
+        }
+        node.isConnected = true
+        node.name = info.name
+        node.focusable = info.focusable
+        node.disabled = info.disabled
+        node.insideHidden = info.insideHidden
+      }
+      for (const [path, binding] of hostRefs) {
+        if (currentRefs.has(path)) continue
+        assignRef(binding.ref, null)
+        hostRefs.delete(path)
+      }
+      for (const [path, current] of currentRefs) {
+        const previous = hostRefs.get(path)
+        const targetNode = hostNodes.get(path) || null
+        if (previous?.ref === current.ref && previous?.node === targetNode) continue
+        if (previous) assignRef(previous.ref, null)
+        hostRefs.set(path, { ref: current.ref, node: targetNode })
+        assignRef(current.ref, targetNode)
+      }
+      for (const item of pendingEffects) {
+        if (item.record.disposed) continue
+        item.previous?.cleanup?.()
+        const cleanup = item.effect()
+        item.record.cells[item.index] = {
+          deps: item.deps,
+          cleanup: typeof cleanup === 'function' ? cleanup : undefined,
+        }
+      }
+      active = undefined
+      return renderTrees
+    }
+
+    function dispose() {
+      if (disposed) return
+      disposed = true
+      for (const record of instances.values()) disposeRecord(record)
+      for (const binding of hostRefs.values()) assignRef(binding.ref, null)
+      for (const node of hostNodes.values()) node.isConnected = false
+      instances.clear()
+      hostRefs.clear()
+      hostNodes.clear()
+    }
+
+    return { renderAll, dispose, hostNodes, focusHistory, get trees() { return renderTrees } }
+  }
+
+  return { React, createDocument, mountSlots }
+}
+
 function setup(options = {}) {
-  let plugin, cursor = 0
-  const cells = [], pendingEffects = [], cleanups = [], registrations = [], calls = []
+  let plugin
+  const effectCleanups = []
+  const slotCleanups = []
+  const slotInjections = []
+  const registrations = []
+  const calls = []
   const writes = { router: [], codex: [], acp: [], agy: [] }
   const catalogRequests = [], requestedForms = [], dictionaries = []
   const snapshots = Object.fromEntries(Object.entries(values).map(([key, value], index) => [key, {
     status: 'ready', writable: true, revision: index + 4, value: structuredClone(value), ...options.snapshots?.[key],
   }]))
   const listeners = { router: new Set(), codex: new Set(), acp: new Set(), agy: new Set() }
-  const state = (initial) => {
-    const i = cursor++
-    if (!(i in cells)) cells[i] = typeof initial === 'function' ? initial() : initial
-    return [cells[i], (next) => { cells[i] = typeof next === 'function' ? next(cells[i]) : next }]
-  }
-  const React = {
-    createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
-    useState: state,
-    useRef: (value) => state(() => ({ current: value }))[0],
-    useEffect: (effect) => { const i = cursor++; if (!(i in cells)) { cells[i] = true; pendingEffects.push(effect) } },
-  }
+  const runtime = createReactRuntime()
+  const doc = runtime.createDocument()
+  let activeLang = options.lang || 'key'
+
   const form = (owner) => ({
     getSnapshot: () => snapshots[owner],
     subscribe: (listener) => { listeners[owner].add(listener); return () => listeners[owner].delete(listener) },
@@ -57,8 +293,9 @@ function setup(options = {}) {
     },
   })
   const forms = { 'multi-agent-router': form('router'), 'codex-provider': form('codex'), 'kimi-code-acp': form('acp'), 'agy-acp': form('agy') }
-  vm.runInNewContext(readFileSync(new URL('../client.js', import.meta.url), 'utf8'), {
-    window: { __ModuleLoader__: { load: ({ factory }) => { plugin = factory(() => React) } } },
+  vm.runInNewContext(clientSource, {
+    window: { __ModuleLoader__: { load: ({ factory }) => { plugin = factory(() => runtime.React) } } },
+    document: doc,
     fetch: async (url) => {
       const owner = url.endsWith('codex') ? 'codex' : url.endsWith('agy') ? 'agy' : 'acp'
       calls.push(owner)
@@ -67,48 +304,144 @@ function setup(options = {}) {
       return { ok: true, json: async () => ({ ok: true, value: catalogs[owner] }) }
     },
   })
+  const bindTranslator = () => (key) => {
+    if (activeLang === 'key') return key
+    const dict = dictionaries.find((entry) => entry.ns === 'dsh-multi-agent')?.dict
+    return dict?.[activeLang]?.[key] ?? key
+  }
+  const slotRegistry = new Set()
   plugin.apply({
-    effect: (fn) => fn(),
-    locale: { register: (ns, dict) => { dictionaries.push({ ns, dict }); return () => {} }, bind: () => (key) => key },
+    effect: (fn) => {
+      const cleanup = fn()
+      if (typeof cleanup === 'function') effectCleanups.push(cleanup)
+      return cleanup
+    },
+    locale: {
+      register: (ns, dict) => {
+        const entry = { ns, dict }
+        dictionaries.push(entry)
+        return () => {
+          const idx = dictionaries.indexOf(entry)
+          if (idx >= 0) dictionaries.splice(idx, 1)
+        }
+      },
+      bind: bindTranslator,
+    },
     configForms: { get: (ns) => { requestedForms.push(ns); return forms[ns] } },
     remote: { session: { modelCatalog: async () => { calls.push('dsh'); return { ok: true, value: catalogs.dsh } } } },
-    slots: { inject: (_name, callback) => callback(), register: (spec, component) => { registrations.push({ spec, component }); return () => {} } },
-  })
-  const expand = (node) => {
-    if (!node || typeof node !== 'object') return node
-    if (typeof node.type === 'function') return expand(node.type(node.props))
-    return { ...node, children: (node.children || []).map(expand) }
-  }
-  return {
-    registrations, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries,
-    render() {
-      cursor = 0
-      const entry = registrations[0]
-      const tree = expand(entry.component({ ...entry.spec.inject(), t: (key) => key }))
-      for (const effect of pendingEffects.splice(0)) cleanups.push(effect())
-      return tree
+    slots: {
+      inject: (name, callback) => {
+        slotInjections.push(name)
+        const cleanup = callback()
+        if (typeof cleanup === 'function') slotCleanups.push(cleanup)
+        return cleanup
+      },
+      register: (spec, component) => {
+        const reg = { spec, component }
+        registrations.push(reg)
+        slotRegistry.add(reg)
+        return () => slotRegistry.delete(reg)
+      },
     },
-    async load() { this.render(); await new Promise((resolve) => setImmediate(resolve)); return this.render() },
+  })
+
+  const headerEntry = registrations.find(({ spec }) => spec.name === 'conversation.session.header.utilities')
+  const overlayEntry = registrations.find(({ spec }) => spec.name === 'shell.overlay')
+  const mounted = runtime.mountSlots({
+    ...(headerEntry ? { header: headerEntry } : {}),
+    ...(overlayEntry ? { overlay: overlayEntry } : {}),
+  }, doc)
+
+  return {
+    plugin, registrations, slotInjections, slotRegistry, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries, doc, mounted,
+    headerEntry, overlayEntry,
+    renderAll(slotProps) { return mounted.renderAll(slotProps) },
+    renderHeader() { return mounted.renderAll().header },
+    render() { return mounted.renderAll().overlay },
+    open() {
+      const header = this.renderHeader()
+      const trigger = control(header, 'multi-agent-dispatch-trigger')
+      assert.ok(trigger, 'header dispatch button must exist')
+      trigger.props.onClick()
+      return this.render()
+    },
+    async load() {
+      this.open()
+      await new Promise((resolve) => setImmediate(resolve))
+      return this.render()
+    },
     edit(name, value) { control(this.render(), name).props.onChange({ target: { value } }) },
-    async save() { await this.render().props.onSubmit({ preventDefault() {} }) },
+    click(name) {
+      const target = control(this.render(), name) || button(this.render(), name)
+      assert.ok(target, `control ${name} must exist`)
+      target.props.onClick?.()
+    },
+    async save() {
+      const formNode = nodes(this.render(), 'form')[0]
+      assert.ok(formNode, 'settings form must exist inside modal')
+      return formNode.props.onSubmit({ preventDefault() {} })
+    },
     update(owner, patch) { snapshots[owner] = { ...snapshots[owner], ...patch }; for (const listener of listeners[owner]) listener() },
-    dispose() { cleanups.forEach((cleanup) => cleanup?.()); assert.ok(Object.values(listeners).every((set) => set.size === 0)) },
+    dispose() {
+      mounted.dispose()
+      for (const cleanup of effectCleanups) cleanup()
+      assert.equal(slotRegistry.size, 0, 'all slot registrations must clean up')
+      assert.equal(doc.listeners.keydown.size, 0, 'document keydown listeners must clean up')
+      assert.equal(doc.listeners.focusin.size, 0, 'document focusin listeners must clean up')
+      assert.ok(Object.values(listeners).every((set) => set.size === 0), 'form listeners must clean up')
+    },
   }
 }
+
 function nodes(tree, type) {
   if (!tree || typeof tree !== 'object') return []
-  return [...(tree.type === type ? [tree] : []), ...(tree.children || []).flatMap((child) => nodes(child, type))]
+  return [...(!type || tree.type === type ? [tree] : []), ...(tree.children || []).flatMap((child) => nodes(child, type))]
 }
-const control = (tree, name) => ['input', 'select', 'textarea'].flatMap((type) => nodes(tree, type)).find((node) => node.props.name === name)
+const control = (tree, name) => ['input', 'select', 'textarea', 'button'].flatMap((type) => nodes(tree, type)).find((node) => node.props.name === name)
+const button = (tree, name) => nodes(tree, 'button').find((node) => node.props.name === name)
 const listValues = (tree, name) => {
   const id = control(tree, name).props.list
   return nodes(tree, 'datalist').find((list) => list.props.id === id).children.map((child) => child.props.value)
 }
+const textOf = (tree) => {
+  if (tree === null || tree === undefined || typeof tree === 'boolean') return ''
+  if (typeof tree === 'string' || typeof tree === 'number') return String(tree)
+  if (tree.type === 'style') return ''
+  return (tree.children || []).map(textOf).join(' ')
+}
 
-test('registers one DSH settings entry and keeps all existing configuration values', async () => {
-  const app = setup()
-  assert.deepEqual(app.registrations.map(({ spec }) => [spec.name, spec.id]), [['settings.section', 'multi-agent-dispatch']])
+test('removes settings.section and registers header utility and shell.overlay with no factory side effects', async () => {
+  const app = setup({ lang: 'zh' })
+  assert.ok(!app.slotInjections.includes('settings.section'), 'settings.section must not be injected')
+  assert.equal(app.registrations.some(({ spec }) => spec.name === 'settings.section'), false, 'settings.section must not be registered')
+  assert.deepEqual(
+    app.registrations.map(({ spec }) => [spec.name, spec.id, spec.order]),
+    [
+      ['conversation.session.header.utilities', 'multi-agent-dispatch', 30],
+      ['shell.overlay', 'multi-agent-dispatch', 30],
+    ],
+  )
+  assert.equal(app.headerEntry.spec.label(), '多 Agent 派发')
+  assert.equal(app.headerEntry.spec.locale, 'dsh-multi-agent')
+  assert.equal(app.overlayEntry.spec.locale, 'dsh-multi-agent')
+
+  const initial = app.renderAll()
+  assert.equal(initial.overlay, null, 'overlay must render null when closed')
+  const trigger = control(initial.header, 'multi-agent-dispatch-trigger')
+  assert.equal(trigger.props['aria-label'], '多 Agent 派发')
+  assert.equal(trigger.props.title, '打开多 Agent 派发设置')
+  assert.equal(trigger.props['aria-haspopup'], 'dialog')
+  assert.equal(trigger.props['aria-expanded'], false)
+  assert.match(textOf(trigger), /多 Agent 派发/)
+
   const tree = await app.load()
+  const reopenedHeader = app.renderHeader()
+  assert.equal(control(reopenedHeader, 'multi-agent-dispatch-trigger').props['aria-expanded'], true)
+  const dialog = nodes(tree, 'div').find((node) => node.props.role === 'dialog')
+  assert.ok(dialog, 'overlay must render dialog when opened')
+  assert.equal(dialog.props['aria-modal'], true)
+  assert.equal(dialog.props['aria-labelledby'], 'ma-dispatch-modal-title')
+  assert.equal(dialog.props['aria-describedby'], 'ma-dispatch-modal-desc')
   for (const name of ['selectionMode', 'timeoutSeconds', 'route.0.prompt', 'dsh.defaultProvider', 'dsh.defaultModel', 'dsh.defaultReasoningEffort', 'codex.model', 'codex.reasoningEffort', 'codex.command', 'codex.permissionPolicy', 'codex.permissionMode', 'codex.env', 'codex.disposeGraceMs', 'acp.model', 'acp.reasoningEffort', 'acp.command', 'acp.args', 'acp.env', 'acp.permission', 'acp.disposeGraceMs', 'acp.disposeEofGraceMs']) assert.ok(control(tree, name), name)
   assert.equal(control(tree, 'codex.reasoningEffort').props.value, 'high')
   assert.equal(control(tree, 'acp.reasoningEffort').props.value, 'max')
@@ -217,10 +550,15 @@ test('discovers the independent agy provider and renders its catalog, runtime fi
   assert.equal(control(tree, 'agy.command').props.value, '/old/agy')
   assert.deepEqual(listValues(tree, 'agy.reasoningEffort'), ['low', 'high'])
   const dict = app.dictionaries.find((entry) => entry.ns === 'dsh-multi-agent').dict
-  for (const key of ['agy.summary', 'agy.title', 'agy.description', 'agy.model', 'agy.command', 'agy.args', 'agy.permission', 'agy.permission.main-session', 'agy.permission.human', 'agy.permission.allow', 'agy.permission.reject', 'agy.permission.subagent', 'agy.subagentMode', 'agy.subagentMode.auto', 'agy.subagentMode.full-access', 'agy.subagentMode.ask-request', 'agy.permissionWarning', 'agy.env', 'agy.envHint', 'agy.disposeEofGraceMs', 'agy.disposeGraceMs']) {
+  assert.deepEqual(Object.keys(dict.en).sort(), Object.keys(dict.zh).sort())
+  for (const key of Object.keys(dict.en)) {
     assert.equal(typeof dict.en[key], 'string', `en ${key}`)
+    assert.ok(dict.en[key].trim().length > 0, `en ${key} non-empty`)
     assert.equal(typeof dict.zh[key], 'string', `zh ${key}`)
+    assert.ok(dict.zh[key].trim().length > 0, `zh ${key} non-empty`)
   }
+  assert.equal(dict.en['unified.title'], 'Multi-agent dispatch')
+  assert.equal(dict.zh['unified.title'], '多 Agent 派发')
   assert.match(dict.en['router.description'], /Antigravity \(agy\)/)
   assert.match(dict.zh['router.description'], /Antigravity \(agy\)/)
   app.dispose()
@@ -352,5 +690,187 @@ test('switching away from sub-agent discards the stale sub-agent level edit', as
   await app.save()
   assert.deepEqual(app.writes.acp.some((write) => write.ops.some((op) => op.op === 'set' && op.path.join('.') === 'permission' && op.value === 'human')), true)
   assert.deepEqual(app.writes.acp.every((write) => write.ops.every((op) => op.path.join('.') !== 'subagentPermissionMode')), true)
+  app.dispose()
+})
+
+test('modal closes via close button, Escape, and backdrop click with focus capture, restoration, and Tab trap', async () => {
+  const app = setup()
+  await app.load()
+  const triggerNode = [...app.mounted.hostNodes.values()].find((node) => node.name === 'multi-agent-dispatch-trigger')
+  const closeNode = [...app.mounted.hostNodes.values()].find((node) => node.name === 'modal-close')
+  const dialogHost = [...app.mounted.hostNodes.values()].find((node) => node.name === 'ma-modal')
+  assert.ok(triggerNode && closeNode && dialogHost)
+  assert.equal(app.doc.activeElement, closeNode, 'opening modal moves focus inside modal')
+  assert.equal(app.doc.listeners.keydown.size, 1)
+  assert.equal(app.doc.listeners.focusin.size, 1)
+
+  // Tab trap wraps from last focusable to first and Shift+Tab wraps backwards.
+  const focusables = dialogHost.querySelectorAll()
+  assert.ok(focusables.length > 5)
+  const first = focusables[0]
+  const last = focusables.at(-1)
+  app.doc.activeElement = last
+  let prevented = false
+  app.doc.dispatch('keydown', { key: 'Tab', shiftKey: false, preventDefault() { prevented = true } })
+  assert.equal(prevented, true)
+  assert.equal(app.doc.activeElement, first)
+
+  prevented = false
+  app.doc.dispatch('keydown', { key: 'Tab', shiftKey: true, preventDefault() { prevented = true } })
+  assert.equal(prevented, true)
+  assert.equal(app.doc.activeElement, last)
+
+  // Focus escaping outside modal is pulled back inside while open.
+  app.doc.dispatch('focusin', { target: triggerNode })
+  assert.equal(dialogHost.contains(app.doc.activeElement), true)
+
+  // IME composing Escape does not close the modal.
+  app.doc.dispatch('keydown', { key: 'Escape', isComposing: true, preventDefault() {}, stopPropagation() {} })
+  assert.ok(app.render(), 'composing Escape must not close modal')
+
+  // Close button closes and restores focus to trigger.
+  app.click('modal-close')
+  assert.equal(app.render(), null)
+  assert.equal(app.doc.activeElement, triggerNode, 'closing modal restores focus to header button')
+  assert.equal(app.doc.listeners.keydown.size, 0)
+  assert.equal(app.doc.listeners.focusin.size, 0)
+
+  // Reopen and close via Escape.
+  await app.load()
+  app.doc.dispatch('keydown', { key: 'Escape', preventDefault() {}, stopPropagation() {} })
+  assert.equal(app.render(), null)
+  assert.equal(app.doc.activeElement, triggerNode)
+
+  // Reopen, drag from inner node onto backdrop must not close; direct backdrop click closes.
+  let tree = await app.load()
+  tree.props.onMouseDown({ target: { inner: true }, currentTarget: tree })
+  tree.props.onClick({ target: tree, currentTarget: tree })
+  assert.ok(app.render(), 'mouse drag starting inside modal must not close on backdrop mouseup')
+
+  tree = app.render()
+  tree.props.onMouseDown({ target: tree, currentTarget: tree })
+  tree.props.onClick({ target: tree, currentTarget: tree })
+  assert.equal(app.render(), null, 'direct backdrop click closes clean modal')
+  assert.equal(app.doc.activeElement, triggerNode)
+  app.dispose()
+})
+
+test('unsaved edits block silent close and allow continuing, saving & closing, or discarding', async () => {
+  const app = setup()
+  await app.load()
+  app.edit('timeoutSeconds', '900')
+
+  // Close button / Escape / backdrop show unsaved confirmation instead of silently dropping edits.
+  app.click('modal-close')
+  let tree = app.render()
+  assert.ok(tree, 'modal must stay open when edits exist')
+  assert.ok(nodes(tree, 'div').some((node) => node.props.role === 'alertdialog'))
+  assert.equal(control(tree, 'timeoutSeconds').props.value, '900')
+
+  // Escape while confirmation is visible returns to editing without discarding edits.
+  app.doc.dispatch('keydown', { key: 'Escape', preventDefault() {}, stopPropagation() {} })
+  tree = app.render()
+  assert.equal(nodes(tree, 'div').some((node) => node.props.role === 'alertdialog'), false)
+  assert.equal(control(tree, 'timeoutSeconds').props.value, '900')
+
+  // Backdrop click also triggers confirmation; Discard & close drops edits and closes.
+  tree.props.onClick({ target: tree, currentTarget: tree })
+  tree = app.render()
+  assert.ok(nodes(tree, 'div').some((node) => node.props.role === 'alertdialog'))
+  app.click('modal-discard-and-close')
+  assert.equal(app.render(), null)
+  assert.equal(app.writes.router.length, 0)
+
+  // Reopen: invalid Save & close keeps modal open with error; valid Save & close writes and closes.
+  await app.load()
+  assert.equal(control(app.render(), 'timeoutSeconds').props.value, 1800)
+  app.edit('acp.env', '{invalid')
+  app.click('modal-close')
+  await control(app.render(), 'modal-save-and-close').props.onClick()
+  tree = app.render()
+  assert.ok(tree, 'failed Save & close must keep modal open')
+  assert.ok(JSON.stringify(tree).includes('common.invalidJson'))
+  assert.equal(control(tree, 'acp.env').props.value, '{invalid')
+
+  app.edit('acp.env', '{"MODE":"fast"}')
+  app.click('modal-close')
+  await control(app.render(), 'modal-save-and-close').props.onClick()
+  assert.equal(app.render(), null, 'successful Save & close closes modal')
+  assert.equal(app.snapshots.acp.value.env.MODE, 'fast')
+  app.dispose()
+})
+
+test('section navigation filters views cleanly while preserving edits and auto-focuses error sections', async () => {
+  const app = setup()
+  await app.load()
+  app.edit('acp.env', '{bad json')
+  app.click('nav-models')
+  let tree = app.render()
+  assert.ok(control(tree, 'codex.model'))
+  assert.equal(control(tree, 'selectionMode'), undefined)
+  assert.equal(control(tree, 'acp.env'), undefined)
+
+  // Validation error in runtime field jumps back to runtime section so error field is visible.
+  await app.save()
+  tree = app.render()
+  assert.ok(control(tree, 'acp.env'), 'validation failure switches to offending section')
+  assert.ok(JSON.stringify(tree).includes('common.invalidJson'))
+
+  app.click('nav-policy')
+  tree = app.render()
+  assert.ok(control(tree, 'selectionMode'))
+  assert.ok(control(tree, 'route.0.prompt'))
+  assert.equal(control(tree, 'codex.model'), undefined)
+
+  app.click('nav-all')
+  tree = app.render()
+  assert.ok(control(tree, 'codex.model'))
+  assert.ok(control(tree, 'selectionMode'))
+  assert.ok(control(tree, 'acp.env'))
+  app.dispose()
+})
+
+test('loading, unavailable, and readonly states still render an accessible closable modal', async () => {
+  const loading = setup({ snapshots: { router: { status: 'loading', writable: false } } })
+  loading.open()
+  let tree = loading.render()
+  assert.ok(nodes(tree, 'div').some((node) => node.props.role === 'dialog'))
+  assert.ok(JSON.stringify(tree).includes('common.loading'))
+  loading.click('modal-footer-close')
+  assert.equal(loading.render(), null)
+  loading.dispose()
+
+  const unavailable = setup({ snapshots: { router: { status: 'unavailable', writable: false } } })
+  unavailable.open()
+  tree = unavailable.render()
+  assert.ok(JSON.stringify(tree).includes('common.unavailable'))
+  unavailable.click('modal-close')
+  assert.equal(unavailable.render(), null)
+  unavailable.dispose()
+
+  const readonly = setup({ snapshots: { router: { status: 'ready', writable: false } } })
+  await readonly.load()
+  tree = readonly.render()
+  assert.ok(JSON.stringify(tree).includes('common.readonly'))
+  assert.equal(button(tree, 'save-changes').props.disabled, true)
+  readonly.doc.dispatch('keydown', { key: 'Escape', preventDefault() {}, stopPropagation() {} })
+  assert.equal(readonly.render(), null)
+  readonly.dispose()
+})
+
+test('client styles use only --dsw-alias-* tokens, restore overlay pointer-events, and avoid Host DOM portals', async () => {
+  const app = setup()
+  const header = app.renderHeader()
+  const overlay = await app.load()
+  const styles = [...nodes(header, 'style'), ...nodes(overlay, 'style')].map((node) => node.children.join('')).join('\n')
+  const cssVars = [...styles.matchAll(/var\((--[a-zA-Z0-9-]+)/g)].map((match) => match[1])
+  assert.ok(cssVars.length > 0)
+  assert.ok(cssVars.every((name) => name.startsWith('--dsw-alias-')), `unexpected CSS variable: ${cssVars.join(', ')}`)
+  assert.ok(!cssVars.includes('--dsw-alias-brand-primary-soft'), 'current DSH themes do not provide brand-primary-soft')
+  assert.doesNotMatch(styles, /#[0-9a-fA-F]{3,8}\b|\brgba?\(/, 'must not hardcode hex or rgb colors')
+  assert.match(styles, /\.ma-overlay-backdrop\{[^}]*pointer-events:auto/)
+  assert.match(styles, /min\(1180px,calc\(100vw - 48px\)\)/)
+  assert.match(styles, /85vh/)
+  assert.doesNotMatch(clientSource, /document\.body|createPortal/)
   app.dispose()
 })

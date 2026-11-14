@@ -1,4 +1,8 @@
-# 0.9.0 子代理权限申请版说明
+# 0.9.2 顶栏多 Agent 设置面板说明
+
+0.9.2 将模型、思考强度、路由规则、权限策略和运行参数从 DSH 设置页迁移到会话顶栏右侧的“多 Agent 派发”按钮与宽敞浮层。全部原有配置值和四个 namespace 的 CAS 保存逻辑保持不变，新增分组浏览、未保存关闭确认、键盘焦点管理及中英文界面；原设置页入口已移除。完整回归共 371 项，370 通过、0 失败、1 项原有条件跳过。
+
+## 0.9.0 子代理权限申请版说明
 
 0.9.0 为 Kimi、agy、Codex 三个子代理后端加入统一的"子代理权限请求策略"，默认 **主会话审批**：权限申请送入派发它的主会话审批链（Web 端原生审批面板），轮次已结束或无应答器时自动降级为交互式审批卡片；也可按 Agent 选择人工审批、允许所有、拒绝所有或子代理控制（auto / full-access / ask-request 三级，agy 的 full-access 追加其原生 `--dangerously-skip-permissions`）。Codex 在交互类策略下改用 on-request 线程（workspace-write、无自动审查器）使真实升级请求可达并可被批准；所有未决路径 fail-closed。0.8.x 保存的 `allow` / `reject` 值继续有效。测试新增 20+ 权限场景；详见 README 的 0.9.0 一节。
 
@@ -36,9 +40,9 @@
 
 这是 npm 格式 TGZ，可交给 DSH 插件管理器从本地绝对路径安装。安装依赖仍需联网；无需接收者自行构建前端。`private: true` 仅阻止误发布 npm，不阻止本地安装。
 
-安装包从 [GitHub Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载：`dsh-multi-agent-0.9.0.tgz` 及同名 `.sha256`。SHA-256 文件用于核对传输完整性，不是数字签名，也不能独立证明来源可信。
+安装包从 [GitHub Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载：`dsh-multi-agent-0.9.2.tgz` 及同名 `.sha256`。SHA-256 文件用于核对传输完整性，不是数字签名，也不能独立证明来源可信。
 
-该包在独立工作区生成，没有替换打包者当前 profile 的安装或权限配置。源码与安装包已发布到 GitHub 仓库与 Releases；未执行 npm publish，也未提交插件市场。
+该包由独立工作区构建；TGZ 不含打包者 profile、用户配置或凭据。源码与安装包发布到 GitHub 仓库与 Releases；不执行 npm publish，也不提交插件市场。
 
 ## 支持边界
 
