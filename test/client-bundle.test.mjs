@@ -19,6 +19,7 @@ function stageBuildRoot(t) {
     rmSync(tempRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
   })
   mkdirSync(join(tempRoot, 'scripts'), { recursive: true })
+  cpSync(join(root, 'package.json'), join(tempRoot, 'package.json'))
   cpSync(join(root, 'client.js'), join(tempRoot, 'client.js'))
   cpSync(join(root, 'tasks-client.js'), join(tempRoot, 'tasks-client.js'))
   cpSync(join(root, 'scripts', 'build-client.mjs'), join(tempRoot, 'scripts', 'build-client.mjs'))
@@ -39,7 +40,8 @@ function assertBundleRuntime(source) {
   const sandbox = { window: { __ModuleLoader__: { load: entry => entries.push(entry) } } }
   vm.runInNewContext(source, sandbox, { timeout: 3000 })
   assert.equal(entries.length, 1)
-  assert.equal(entries[0].id, 'dsh-multi-agent')
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  assert.equal(entries[0].id, manifest.name)
   assert.equal(sandbox.markdownit, undefined)
   const imports = []
   const plugin = entries[0].factory(id => {

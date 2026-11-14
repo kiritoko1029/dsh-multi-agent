@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -30,6 +30,7 @@ if (!existsSync(artifact)) {
 
 const digest = createHash('sha256').update(readFileSync(artifact)).digest('hex')
 writeFileSync(`${artifact}.sha256`, `${digest}  ${expected}\n`)
+if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `sha256=${digest}\n`)
 
 console.log(`\nArtifact: dist/${expected}`)
 console.log(`SHA-256:  ${digest}`)

@@ -2,6 +2,8 @@ name: Release
 
 # Pushing a v* tag builds the plugin TGZ and publishes it as a GitHub Release
 # asset, with the release notes taken from the matching CHANGELOG.md section.
+# After the Release succeeds, publish-npm verifies and publishes the same TGZ to
+# npm. npm Trusted Publishing exchanges GitHub OIDC identity; no token is stored.
 on:
   push:
     tags:
@@ -17,6 +19,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tgz_sha256: ${{ steps.build-release.outputs.sha256 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -38,6 +42,9 @@ jobs:
       - name: Syntax check
         run: npm run check
 
+      - name: Test
+        run: npm test
+
       - name: Verify tag matches package.json version
         run: |
           set -euo pipefail
@@ -52,6 +59,7 @@ jobs:
         run: npm run build
 
       - name: Build TGZ and SHA-256
+        id: build-release
         run: node scripts/build-release.mjs
 
       - name: Extract release notes from CHANGELOG.md
@@ -67,3 +75,43 @@ jobs:
             --title "dsh-multi-agent $GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \
             --verify-tag
+
+  publish-npm:
+    name: Publish npm package
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js for npm
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # Trusted Publishing requires npm 11.5.1+; this also installs the current
+      # staged-publishing and integrity-verification fixes in the 11.x line.
+      - name: Update npm for Trusted Publishing
+        run: npm install --global npm@11.20.0
+
+      - name: Download GitHub Release package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.tgz' \
+            --pattern '*.sha256' \
+            --dir dist \
+            --clobber
+
+      # The helper binds the tag, checkout manifest, Release SHA-256 output,
+      # tarball manifest and SHA-512 integrity before publishing. It also makes
+      # retries idempotent when npm accepted a version but the response was lost.
+      - name: Verify and publish with npm Trusted Publishing
+        env:
+          EXPECTED_TGZ_SHA256: ${{ needs.release.outputs.tgz_sha256 }}
+        run: node scripts/publish-npm.mjs

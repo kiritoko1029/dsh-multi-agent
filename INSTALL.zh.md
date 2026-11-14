@@ -1,6 +1,8 @@
 # DSH 多 Agent 派发 0.9.2 — 安装与安全说明
 
-本项目不是 DSH 官方插件。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)，未发布到 npm；请从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载 `dsh-multi-agent-0.9.2.tgz` 及其 `.sha256` 校验文件。
+本项目不是 DSH 官方插件。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)；0.9.2 未追溯发布到 npm，请从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载 `dsh-multi-agent-0.9.2.tgz` 及其 `.sha256` 校验文件。后续新版本会由 Release 工作流同步到 npm 包 `@kiritoko1029/dsh-multi-agent`，但 DSH 安装仍按本文使用插件管理器，不要在 profile 目录手动执行 npm / pnpm 安装。
+
+后续 scoped 包的 Release 资产名为 `kiritoko1029-dsh-multi-agent-<version>.tgz`。包名同时也是插件安装身份；从旧 `dsh-multi-agent` 升级时应先备份配置并按插件管理器提示处理旧包，不要让新旧两个包同时启用。既有 0.9.2 资产名和安装方式不变。
 
 ## 一、准备环境
 

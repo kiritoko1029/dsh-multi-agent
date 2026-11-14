@@ -480,10 +480,10 @@ async function mountPortablePatch(entries, { applyCodexOfficial } = {}) {
   await mountPlugin(HostStubs)
 
   const pluginModules = {
-    'dsh-multi-agent/availability': MultiAgentAvailability,
-    'dsh-multi-agent/acp-provider': acpPlugin,
-    'dsh-multi-agent/agy-provider': agyPlugin,
-    'dsh-multi-agent/codex-provider': applyCodexOfficial
+    '@kiritoko1029/dsh-multi-agent/availability': MultiAgentAvailability,
+    '@kiritoko1029/dsh-multi-agent/acp-provider': acpPlugin,
+    '@kiritoko1029/dsh-multi-agent/agy-provider': agyPlugin,
+    '@kiritoko1029/dsh-multi-agent/codex-provider': applyCodexOfficial
       ? {
           name: codexPlugin.name,
           inject: codexPlugin.inject,

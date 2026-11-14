@@ -2,6 +2,21 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
+## [未发布]
+
+### 新增
+
+- GitHub Release 工作流新增 `publish-npm` 后续任务：新版本标签完成 GitHub Release 后，下载并校验同一份 TGZ 资产，自动发布到 npm 并附加 provenance。
+- 使用 npm Trusted Publishing：npm 11.20.0 通过 GitHub OIDC 获取短期发布凭证，不配置或存储 `NPM_TOKEN` 等长期令牌。
+- 新增发布校验脚本，绑定标签、checkout 与 TGZ 清单、仓库、Release 构建 SHA-256、侧车和 npm SHA-512 integrity；支持重复运行跳过与发布后有界验证。
+- Release 任务增加完整测试门禁，测试通过后才创建 Release 并进入 npm 发布任务。
+
+### 变更
+
+- 包名改为 `@kiritoko1029/dsh-multi-agent`，移除 `private: true`，显式设置公共 npm registry 与 `access: public`；后续 Release TGZ 使用 scoped 包名生成的资产文件名。
+- Cordis patch、Client module id 与 locale namespace 同步使用 scoped 包名；包名也是 DSH 插件安装身份，升级时不要同时启用新旧两个包。
+- 为配置 Trusted Publisher 创建 `0.9.3-stage.0` 暂存引导版本；该版本未公开，不是稳定插件发行版。现有 0.9.2 及更早版本不追溯发布，首个启用该流程的新版本开始自动发布。
+
 ## [0.9.2] - 2026-11-14
 
 ### 新增

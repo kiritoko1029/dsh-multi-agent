@@ -1,10 +1,10 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-multi-agent',
+  id: '@kiritoko1029/dsh-multi-agent',
   factory(require) {
     const React = require('react')
     const h = React.createElement
     const { useState, useEffect, useRef } = React
-    const NS = 'dsh-multi-agent'
+    const NS = '@kiritoko1029/dsh-multi-agent'
     const AGENT_OPTIONS = [
       { value: 'codex', label: 'Codex' },
       { value: 'kimi-code', label: 'Kimi Code' },

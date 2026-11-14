@@ -1,15 +1,15 @@
 - insert:
     - id: multi-agent-availability
-      name: 'dsh-multi-agent/availability'
+      name: '@kiritoko1029/dsh-multi-agent/availability'
     - id: multi-agent-task-monitor
-      name: 'dsh-multi-agent/task-monitor'
+      name: '@kiritoko1029/dsh-multi-agent/task-monitor'
     - id: multi-agent-delegation-policy
-      name: 'dsh-multi-agent/delegation-policy'
+      name: '@kiritoko1029/dsh-multi-agent/delegation-policy'
     - id: multi-agent-router
-      name: 'dsh-multi-agent'
+      name: '@kiritoko1029/dsh-multi-agent'
       config: {}
     - id: kimi-code-acp
-      name: 'dsh-multi-agent/acp-provider'
+      name: '@kiritoko1029/dsh-multi-agent/acp-provider'
       config:
         providerName: kimi-code
         command: !!js "ctx.get('multiAgentAvailability')?.kimiCommand"
@@ -18,7 +18,7 @@
         subagentPermissionMode: auto
       inject: [multiAgentAvailability]
     - id: agy-acp
-      name: 'dsh-multi-agent/agy-provider'
+      name: '@kiritoko1029/dsh-multi-agent/agy-provider'
       config:
         providerName: agy
         command: !!js "ctx.get('multiAgentAvailability')?.agyCommand"
@@ -27,7 +27,7 @@
         subagentPermissionMode: auto
       inject: [multiAgentAvailability]
     - id: codex-provider
-      name: 'dsh-multi-agent/codex-provider'
+      name: '@kiritoko1029/dsh-multi-agent/codex-provider'
       config:
         providerName: codex-router
         permissionPolicy: main-session

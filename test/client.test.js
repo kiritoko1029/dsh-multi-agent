@@ -306,7 +306,7 @@ function setup(options = {}) {
   })
   const bindTranslator = () => (key) => {
     if (activeLang === 'key') return key
-    const dict = dictionaries.find((entry) => entry.ns === 'dsh-multi-agent')?.dict
+    const dict = dictionaries.find((entry) => entry.ns === '@kiritoko1029/dsh-multi-agent')?.dict
     return dict?.[activeLang]?.[key] ?? key
   }
   const slotRegistry = new Set()
@@ -422,8 +422,8 @@ test('removes settings.section and registers header utility and shell.overlay wi
     ],
   )
   assert.equal(app.headerEntry.spec.label(), '多 Agent 派发')
-  assert.equal(app.headerEntry.spec.locale, 'dsh-multi-agent')
-  assert.equal(app.overlayEntry.spec.locale, 'dsh-multi-agent')
+  assert.equal(app.headerEntry.spec.locale, '@kiritoko1029/dsh-multi-agent')
+  assert.equal(app.overlayEntry.spec.locale, '@kiritoko1029/dsh-multi-agent')
 
   const initial = app.renderAll()
   assert.equal(initial.overlay, null, 'overlay must render null when closed')
@@ -549,7 +549,7 @@ test('discovers the independent agy provider and renders its catalog, runtime fi
   assert.equal(control(tree, 'agy.model').props.value, 'agy/gemini-test')
   assert.equal(control(tree, 'agy.command').props.value, '/old/agy')
   assert.deepEqual(listValues(tree, 'agy.reasoningEffort'), ['low', 'high'])
-  const dict = app.dictionaries.find((entry) => entry.ns === 'dsh-multi-agent').dict
+  const dict = app.dictionaries.find((entry) => entry.ns === '@kiritoko1029/dsh-multi-agent').dict
   assert.deepEqual(Object.keys(dict.en).sort(), Object.keys(dict.zh).sort())
   for (const key of Object.keys(dict.en)) {
     assert.equal(typeof dict.en[key], 'string', `en ${key}`)

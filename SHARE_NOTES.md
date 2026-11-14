@@ -38,11 +38,11 @@
 
 ## 安装包性质
 
-这是 npm 格式 TGZ，可交给 DSH 插件管理器从本地绝对路径安装。安装依赖仍需联网；无需接收者自行构建前端。`private: true` 仅阻止误发布 npm，不阻止本地安装。
+这是 npm 格式 TGZ，可交给 DSH 插件管理器从本地绝对路径安装。安装依赖仍需联网；无需接收者自行构建前端。包清单已允许公共 npm 发布，但只有推送新版本标签并通过 GitHub Release 工作流才会发布，本地安装不会触发 npm publish。
 
 安装包从 [GitHub Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载：`dsh-multi-agent-0.9.2.tgz` 及同名 `.sha256`。SHA-256 文件用于核对传输完整性，不是数字签名，也不能独立证明来源可信。
 
-该包由独立工作区构建；TGZ 不含打包者 profile、用户配置或凭据。源码与安装包发布到 GitHub 仓库与 Releases；不执行 npm publish，也不提交插件市场。
+该包由独立工作区构建；TGZ 不含打包者 profile、用户配置或凭据。源码与安装包发布到 GitHub 仓库与 Releases；启用自动发布流程后的新版本会由 GitHub Actions 通过 OIDC Trusted Publishing 同步到 npm 包 `@kiritoko1029/dsh-multi-agent`，对应资产名为 `kiritoko1029-dsh-multi-agent-<version>.tgz`。0.9.2 及更早版本不追溯发布，也不提交插件市场。
 
 ## 支持边界
 
