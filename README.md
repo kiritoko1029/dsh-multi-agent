@@ -139,7 +139,7 @@ DSH Subagent Manager
 
 - `model`：位于顶栏“多 Agent 派发”面板顶部的默认 Codex 模型；通过可用性检测到的本机当前 Codex CLI 执行 `debug models`（不使用 `--bundled` 静态快照），读取与交互 `/models` 一致的公开模型（`visibility: list`），可下拉选择或手动输入；留空使用 Codex 原生配置，后续每次启动都会读取最新值。
 - `reasoningEffort`：默认思考强度；建议取自 Codex 目录的 `supported_reasoning_levels`，执行时明确发送到 app-server 的 `turn/start.effort`。留空时不覆盖原生默认值。
-- `permissionPolicy`：子代理权限请求策略，默认 `main-session`。主会话审批 / 人工审批 / 允许所有时线程使用 ask-request 参数（无自动审查器），真实升级请求按策略决定；拒绝所有与子代理控制的 `auto` 沿用下方 `permissionMode`。
+- `permissionPolicy`：子代理权限请求策略，默认 `main-session`。主会话审批 / 人工审批 / 允许所有时线程使用 ask-request 参数（无自动审查器），真实升级请求按策略决定；主会话有效权限为“不再询问 + 完全权限”（`never + danger-full-access`）时，改用 Codex 原生完全权限线程并自动允许其申请，避免策略自动拒绝。拒绝所有与子代理控制的 `auto` 沿用下方 `permissionMode`。
 - `subagentPermissionMode`：子代理控制等级（`auto` / `full-access` / `ask-request`），仅策略为 `subagent` 时生效，映射到 Codex 原生线程模式。
 - `permissionMode`：Codex 原生线程权限模式，默认 `approve-for-me`（自动审查 + workspace-write）；策略为拒绝所有或子代理控制 auto 时直接作为线程模式使用。
 - `env`：Codex 子进程环境覆盖。
@@ -152,7 +152,7 @@ DSH Subagent Manager
 - `reasoningEffort`：默认思考强度；建议取自模型的 `supportEfforts`。模型设置成功后，按会话最新返回的 `thinking` 选项验证并设置强度；不支持的值会在发送任务前报错，不会静默忽略。
 - `command` / `args`：默认 `<本机 kimi 路径> acp`。
 - `permission`：子代理权限请求策略，默认 `main-session`（主会话审批）。
-  - `main-session`：申请送主会话审批链；主会话轮次已结束时降级为交互卡片。
+  - `main-session`：申请送主会话审批链；主会话轮次已结束时降级为交互卡片。若主会话有效权限恰好为“不再询问 + 完全权限”（`never + danger-full-access`），子代理继承该组合并自动允许申请；其他组合仍按原审批链处理，用户主动拒绝不会被改写为允许。权限状态在每次任务启动时读取，本次启动后保持不变。
   - `human`：每次申请弹交互式审批卡片。
   - `allow`：自动选择 ACP 返回的首个 `allow_once` / `allow_always` 选项。
   - `reject`：拒绝子代理发出的权限请求，可能导致报告写入或任务执行失败。
@@ -168,7 +168,7 @@ DSH Subagent Manager
 - `command` / `args`：使用本机自动检测到的 agy 路径和 `["acp"]`；可在顶栏面板中修改命令，特殊安装位置需同步设置 `AGY_COMMAND`，供 DSH 启动时检测。
 - `model` / `reasoningEffort`：留空沿用原生默认值；指定后通过 ACP 会话配置设置。思考强度使用 agy 的 `thought_level`，与 Kimi 的 `thinking` 分开处理。不要把普通 CLI 的 `--model` / `--effort` 直接追加到 `agy acp` 参数。
 - 模型建议来自 `GET /multi-agent/model-catalog/agy`：通过短暂 ACP 会话读取实际模型族及各模型支持的强度，15 秒超时并回收进程，不执行任务 prompt。不要把 `agy models` 中带强度后缀的组合 ID 当作模型族填写。可选模型以当前账号和 ACP 返回值为准。
-- `permission`：子代理权限请求策略，默认 `main-session`（主会话审批），选项与 Kimi 相同（`main-session` / `human` / `allow` / `reject` / `subagent`）。
+- `permission`：子代理权限请求策略，默认 `main-session`（主会话审批），选项与 Kimi 相同（`main-session` / `human` / `allow` / `reject` / `subagent`）。继承主会话“不再询问 + 完全权限”时，agy 会追加原生 `--dangerously-skip-permissions`；Kimi 没有公开跳过参数，通过自动允许其 ACP 权限申请实现。
 - `subagentPermissionMode`：子代理控制等级。agy 与 Kimi 的差异在 `full-access`：agy 会追加原生 `--dangerously-skip-permissions` 启动参数，彻底交由其内部权限体系；其余等级语义一致。
 - `env` 与退出宽限参数：语义与 Kimi ACP 相同；已有登录无需额外填写密钥。
 - 可在路由规则、默认 Agent 中选择 `agy`，或直接调用 `dispatch_agent` 并指定 `agent: "agy"`。结果、工具活动和报告进入同一任务面板。
@@ -192,7 +192,7 @@ DSH Subagent Manager
 - DSH 子代理不依赖外部 CLI，始终作为本机兜底。模型选择仍遵守当前 Session 的模型授权和能力校验。
 - 新安装外部 CLI 后需要重载插件或重启 DSH，让 Loader 重新计算组件可用性。
 
-**安全边界：** Kimi 和 agy 非交互任务可以写文件、执行 Shell。任何批准类策略（主会话审批中点了允许、人工审批、允许所有、子代理控制）都可能批准这些操作，且都不是操作系统沙箱；请只在受信任工作区使用。需要隔离时使用独立 worktree、容器或操作系统沙箱，不要仅靠提示词声明“只读”。
+**安全边界：** Kimi 和 agy 非交互任务可以写文件、执行 Shell。任何批准类策略（主会话审批中点了允许、人工审批、允许所有、子代理控制）都可能批准这些操作，且都不是操作系统沙箱。主会话选择“不再询问 + 完全权限”是有意的完全授权：使用默认 `main-session` 策略时，Codex / Kimi / agy 会继承该权限，不再逐项询问；如需逐项审批，请把主会话审批改回“询问”，或为对应 Agent 选择人工审批等显式策略。请只在受信任工作区使用；需要隔离时使用独立 worktree、容器或操作系统沙箱，不要仅靠提示词声明“只读”。
 
 ## 主 Agent 调用契约
 

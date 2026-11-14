@@ -74,10 +74,11 @@ Windows 只接受 DSH 托管进程边界可直接启动的原生程序。`.cmd` 
 
 - **0.9.0 起，Kimi / agy / Codex 新安装默认 `permission: main-session`（主会话审批）。** 子代理的权限申请会送到派发它的主会话：主会话轮次进行中出现原生审批面板；轮次已结束则弹出交互式审批卡片。没有人作答或服务不可用时一律拒绝（fail-closed）。
 - 五种策略按 Agent 在顶栏“多 Agent 派发”面板独立配置：`main-session`（主会话审批）、`human`（人工审批卡片）、`allow`（允许所有）、`reject`（拒绝所有，0.8.x 的 Kimi/agy 默认，旧保存值继续有效）、`subagent`（子代理控制，含 `auto` / `full-access` / `ask-request` 三个等级；agy 的 `full-access` 会追加其原生 `--dangerously-skip-permissions` 参数）。
+- **当前版本的完全权限继承例外：** 默认 `main-session` 策略会读取主会话有效权限；只有恰好为“不再询问 + 完全权限”（`never + danger-full-access`）时才自动继承，避免 Host 将自动拒绝传给子代理。Codex 使用原生完全权限线程，agy 使用原生跳过权限参数，Kimi 自动允许其 ACP 权限申请。其他组合仍走原审批链，用户主动拒绝继续拒绝；显式选择 `human` 等其他策略时不触发继承。
 - 批准操作可能允许写文件、执行命令及访问 CLI 自身可访问的内容。这些策略**都不是操作系统级沙箱**，也不保证 CLI 的所有行为都会请求权限。敏感工作应使用独立工作目录、容器或其它隔离方式。
-- Codex 在主会话审批 / 人工审批 / 允许所有策略下以 on-request 线程运行（workspace-write 沙箱、无自动审查器），真实升级请求才会到达送审；拒绝所有与子代理控制 `auto` 沿用其 `permissionMode`（默认 `approve-for-me` 自动审查）。
+- Codex 在主会话审批 / 人工审批 / 允许所有策略下以 on-request 线程运行（workspace-write 沙箱、无自动审查器），真实升级请求才会到达送审；继承上述完全权限组合时改用原生 `danger-full-access` 线程；拒绝所有与子代理控制 `auto` 沿用其 `permissionMode`（默认 `approve-for-me` 自动审查）。
 - DSH、Codex、Kimi、agy 使用各自的模型配置、登录和计费。多个 Agent 并行可能同时消耗额度。
-- 父 DSH 的权限设置不等于所有外部 CLI 自动继承相同权限。安装本插件不代表授予所有后续操作无限权限。
+- 除上述默认策略下的明确完全权限组合外，父 DSH 的权限设置不等于所有外部 CLI 自动继承相同权限。安装本插件本身不代表授予所有后续操作无限权限；只有主会话有效组合和 Agent 策略同时满足上述条件才继承。
 
 本包不包含分享者的账号、密钥、会话历史、任务报告、备份或 node_modules。首次安装仍会从配置的包仓库下载 npm 依赖；它不是离线全依赖包。
 

@@ -4,7 +4,7 @@ import { PROTOCOL_VERSION, client, methods, ndJsonStream } from '@agentclientpro
 import z from '@deepseek-ai/schemastery'
 import { currentTaskTrace } from './task-monitor.js'
 import { currentValue, dynamicAcpConfig } from './lib/config.js'
-import { createPermissionAsker, normalizePermissionPolicy, normalizeSubagentPermissionMode, PERMISSION_POLICIES, SUBAGENT_PERMISSION_MODES } from './lib/permission-policy.js'
+import { createPermissionAsker, normalizePermissionPolicy, normalizeSubagentPermissionMode, PERMISSION_POLICIES, resolveMainSessionFullAccess, SUBAGENT_PERMISSION_MODES } from './lib/permission-policy.js'
 import { kimiCatalogFromOutput, registerModelCatalogRoute, runCatalogCommand } from './lib/model-catalog-route.js'
 import { sameDirectory } from './lib/path-compat.js'
 import { assertDirectCommand, commandEnvironment, hasEnvironmentKey } from './lib/process-command.js'
@@ -693,6 +693,8 @@ export class AcpProvider {
     }
     const permissionPolicy = normalizePermissionPolicy(currentValue(this.config.permission))
     const subagentPermissionMode = normalizeSubagentPermissionMode(currentValue(this.config.subagentPermissionMode))
+    const mainSessionFullAccess = permissionPolicy === 'main-session'
+      && resolveMainSessionFullAccess(this.ctx, request.parent)
     const askPermission = createPermissionAsker({
       ctx: this.ctx,
       parent: request.parent,
@@ -702,13 +704,15 @@ export class AcpProvider {
       agentLabel: this.dialect.label,
       language: trace?.record?.language,
       signal: request.signal,
+      mainSessionFullAccess,
     })
     // The agy CLI exposes a native full-access bypass; kimi acp documents no
     // startup flag, so its full-access level is realized by granting every
-    // ask instead.
+    // ask instead. The same backend treatment applies to an explicitly
+    // configured subagent full access and an inherited native full preset.
     const bypassArgs = this.dialect.bypassFlag !== undefined
-      && permissionPolicy === 'subagent'
-      && subagentPermissionMode === 'full-access'
+      && (mainSessionFullAccess
+        || (permissionPolicy === 'subagent' && subagentPermissionMode === 'full-access'))
       && !(this.config.args ?? []).includes(this.dialect.bypassFlag)
       ? [this.dialect.bypassFlag]
       : []

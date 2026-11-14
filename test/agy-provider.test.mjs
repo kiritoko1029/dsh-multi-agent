@@ -108,15 +108,15 @@ function spawnAcpChild(spec) {
   }
 }
 
-function harness({ model: initialModel, reasoningEffort: initialEffort, available = true, env = {}, manualCommand } = {}) {
+function harness({ model: initialModel, reasoningEffort: initialEffort, available = true, env = {}, manualCommand, permission = 'allow', parent, permissionPresets, sandboxPolicy, approval } = {}) {
   let model = initialModel
   let reasoningEffort = initialEffort
-  const state = { observations: [], saved: [], warnings: [] }
+  const state = { observations: [], saved: [], warnings: [], spawns: [] }
   const config = {
     providerName: 'agy',
     command: manualCommand ?? (available ? process.execPath : undefined),
     args: ['--eval', ACP_AGENT_SOURCE],
-    permission: 'allow',
+    permission,
     env,
     model: { get: () => model },
     reasoningEffort: { get: () => reasoningEffort },
@@ -130,9 +130,17 @@ function harness({ model: initialModel, reasoningEffort: initialEffort, availabl
         setExternalSession(agent, sessionId) { state.saved.push({ agent, sessionId }) },
         setTelemetry(update) { (state.telemetry ??= []).push(update) },
       }
+      if (key === 'approval') return approval
+      if (key === 'permissionPresets') return permissionPresets
+      if (key === 'sandboxPolicy') return sandboxPolicy
       return { agy: available, ...(available ? { agyCommand: '/detected/agy' } : {}) }
     },
-    subprocess: { spawn: spawnAcpChild },
+    subprocess: { spawn(spec) {
+      state.spawns.push(spec)
+      // The fake child is Node rather than agy; record the real agy argv but
+      // remove the agy-only switch before starting the protocol fixture.
+      return spawnAcpChild({ ...spec, argv: spec.argv.filter((value) => value !== '--dangerously-skip-permissions') })
+    } },
     subagents: { registerProvider(value) { state.provider = value } },
     webServer: { register(route) { state.route = route; return () => {} } },
     effect: (callback) => callback(),
@@ -149,6 +157,7 @@ function harness({ model: initialModel, reasoningEffort: initialEffort, availabl
       const run = await runWithTaskTrace(trace, () => state.provider.start({
         cwd: process.cwd(), prompt: [{ type: 'text', text: 'Return ACP requests.' }],
         signal: new AbortController().signal,
+        ...(parent === undefined ? {} : { parent }),
       }))
       try {
         const result = await run.result
@@ -220,6 +229,34 @@ test('new sessions set agy model family then thought_level using current ACP opt
 test('omitted agy model and effort preserve native session defaults', async () => {
   const agent = harness()
   assert.deepEqual((await agent.run()).requests.map((request) => request.method), ['initialize', 'session/new', 'session/prompt'])
+})
+
+test('agy inherits the native full preset through its bypass flag', async () => {
+  const agent = harness({
+    permission: 'main-session',
+    parent: { id: 'parent-1', session: { id: 'session-1' } },
+    permissionPresets: {
+      current: () => 'full',
+      resolve: () => ({ approval: 'never', sandbox: 'danger-full-access' }),
+    },
+  })
+  await agent.run()
+  assert.equal(agent.state.spawns[0].argv.includes('--dangerously-skip-permissions'), true)
+})
+
+test('agy does not bypass permissions for a non-full main-session preset', async () => {
+  const agent = harness({
+    permission: 'main-session',
+    parent: { id: 'parent-1', session: { id: 'session-1' } },
+    permissionPresets: {
+      current: () => 'custom',
+      resolve: () => { throw new Error('custom preset has no named resolver') },
+    },
+    approval: { defaultPolicy: 'ask', overrideOf: () => undefined },
+    sandboxPolicy: { resolve: () => ({ mode: 'danger-full-access' }) },
+  })
+  await agent.run()
+  assert.equal(agent.state.spawns[0].argv.includes('--dangerously-skip-permissions'), false)
 })
 
 test('agy rejects unavailable models and efforts before prompt', async () => {

@@ -481,6 +481,8 @@ async function vendoredPermissionRun(values) {
       if (name === 'multiAgentTasks') return values.tasks
       if (name === 'approval') return values.approval
       if (name === 'userQuestions') return values.userQuestions
+      if (name === 'permissionPresets') return values.permissionPresets
+      if (name === 'sandboxPolicy') return values.sandboxPolicy
       return { codex: true, codexCommand: '/native/codex' }
     },
     subprocess: { spawn: (spec) => spawnCodexChild(spec) },
@@ -550,6 +552,23 @@ test('main-session approval grants a command ask through the approval chain', as
   })
   assert.equal(asks.length, 1)
   assert.match(asks[0].reason, /npm test/)
+  assert.deepEqual(observed.requests.approval, { decision: 'accept' })
+})
+
+test('main-session full preset starts a native full-access Codex thread', async () => {
+  const observed = await vendoredPermissionRun({
+    permissionPolicy: 'main-session',
+    env: { CODEX_ASK_APPROVAL: 'command' },
+    parent: { id: 'parent-1', session: { id: 'session-1' } },
+    permissionPresets: {
+      current: () => 'full',
+      resolve: () => ({ approval: 'never', sandbox: 'danger-full-access' }),
+    },
+    approval: { async request() { throw new Error('must not be called') } },
+  })
+  assert.equal(observed.requests.thread.approvalPolicy, 'never')
+  assert.equal(observed.requests.thread.sandbox, 'danger-full-access')
+  assert.equal(Object.hasOwn(observed.requests.thread, 'approvalsReviewer'), false)
   assert.deepEqual(observed.requests.approval, { decision: 'accept' })
 })
 

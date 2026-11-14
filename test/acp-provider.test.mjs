@@ -190,6 +190,8 @@ function harness(initialModel, initialEffort, env = {}, availability = { kimiCod
       if (name === 'multiAgentTasks') return tasks
       if (name === 'approval') return options.approval
       if (name === 'userQuestions') return options.userQuestions
+      if (name === 'permissionPresets') return options.permissionPresets
+      if (name === 'sandboxPolicy') return options.sandboxPolicy
       assert.equal(name, 'multiAgentAvailability')
       return availability
     },
@@ -564,6 +566,21 @@ test('a Chinese task renders the permission heading with a Chinese kind label', 
   assert.match(approvalRequests[0].reason, /path: \/tmp\/probe\/hello\.txt/)
   await asker({ kindLabel: 'execute', title: 'echo probe-ok', detail: 'command: echo probe-ok' })
   assert.match(approvalRequests[1].reason, /子代理权限请求（执行命令）/)
+})
+
+test('main-session full preset auto-approves ACP requests without calling the native chain', async () => {
+  const agent = harness(undefined, undefined, { ACP_ASK_PERMISSION: '1' }, { kimiCode: true }, {
+    permission: 'main-session',
+    parent: { id: 'parent-1', session: { id: 'session-1' } },
+    permissionPresets: {
+      current: () => 'full',
+      resolve: () => ({ approval: 'never', sandbox: 'danger-full-access' }),
+    },
+    approval: { async request() { throw new Error('must not be called') } },
+    userQuestions: { async ask() { throw new Error('must not be called') } },
+  })
+  const { requests } = await agent.run()
+  assert.deepEqual(permissionEntry(requests), { outcome: { outcome: 'selected', optionId: 'allow-always' } })
 })
 
 test('main-session rejection denies the ask without falling through to a card', async () => {

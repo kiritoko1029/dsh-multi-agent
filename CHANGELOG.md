@@ -17,6 +17,11 @@
 - Cordis patch、Client module id 与 locale namespace 同步使用 scoped 包名；包名也是 DSH 插件安装身份，升级时不要同时启用新旧两个包。
 - 为配置 Trusted Publisher 创建 `0.9.3-stage.0` 暂存引导版本；该版本未公开，不是稳定插件发行版。现有 0.9.2 及更早版本不追溯发布，首个启用该流程的新版本开始自动发布。
 
+### 修复
+
+- 默认 `main-session` 策略现在读取主会话有效权限预设；仅在 `never + danger-full-access`（不再询问 + 完全权限）同时成立时继承完全权限，不再把 Host 的策略自动拒绝误当成子代理应拒绝。
+- 继承时 Codex 使用原生 `danger-full-access` 线程，agy 追加 `--dangerously-skip-permissions`，Kimi 自动允许 ACP 权限申请。其他权限组合、显式人工审批等策略及服务检测失败仍走原审批链，用户主动拒绝保持拒绝。
+
 ## [0.9.2] - 2026-11-14
 
 ### 新增
