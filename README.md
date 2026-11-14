@@ -22,7 +22,7 @@
 - 任务面板使用 DSH 原生右侧栏与文件预览，无需安装第三方侧栏扩展。
 - macOS 是当前验证平台；Linux / Windows 未作实机安装和 CLI 执行验收，不承诺跨平台即装即用。
 
-版本变更只记录在 [更新日志](CHANGELOG.md)，不在 README 重复维护。后续新版本会同步到 [npm 包 `@kiritoko1029/dsh-multi-agent`](https://www.npmjs.com/package/@kiritoko1029/dsh-multi-agent)；历史版本不追溯发布。
+版本变更只记录在 [更新日志](CHANGELOG.md)，不在 README 重复维护。0.9.3 起稳定版同步到 [npm 包 `@kiritoko1029/dsh-multi-agent`](https://www.npmjs.com/package/@kiritoko1029/dsh-multi-agent)；历史版本不追溯发布。
 
 ## DSH 版本兼容
 

@@ -2,7 +2,7 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
-## [未发布]
+## [0.9.3] - 2026-11-14
 
 ### 新增
 
@@ -15,12 +15,17 @@
 
 - 包名改为 `@kiritoko1029/dsh-multi-agent`，移除 `private: true`，显式设置公共 npm registry 与 `access: public`；后续 Release TGZ 使用 scoped 包名生成的资产文件名。
 - Cordis patch、Client module id 与 locale namespace 同步使用 scoped 包名；包名也是 DSH 插件安装身份，升级时不要同时启用新旧两个包。
-- 为配置 Trusted Publisher 创建 `0.9.3-stage.0` 暂存引导版本；该版本未公开，不是稳定插件发行版。现有 0.9.2 及更早版本不追溯发布，首个启用该流程的新版本开始自动发布。
+- 为配置 Trusted Publisher 创建 `0.9.3-stage.0` 预发布引导版本；它不是稳定插件发行版。现有 0.9.2 及更早版本不追溯发布，从 0.9.3 开始由发布工作流自动发布稳定版。
 
 ### 修复
 
 - 默认 `main-session` 策略现在读取主会话有效权限预设；仅在 `never + danger-full-access`（不再询问 + 完全权限）同时成立时继承完全权限，不再把 Host 的策略自动拒绝误当成子代理应拒绝。
 - 继承时 Codex 使用原生 `danger-full-access` 线程，agy 追加 `--dangerously-skip-permissions`，Kimi 自动允许 ACP 权限申请。其他权限组合、显式人工审批等策略及服务检测失败仍走原审批链，用户主动拒绝保持拒绝。
+
+### 测试
+
+- 新增发布资产身份、OIDC、integrity、幂等恢复及主会话权限继承测试；完整回归共 400 项，399 通过、0 失败、1 项原有条件跳过。
+- `npm run check`、`npm run build`、`npm run release:pack` 与 `git diff --check` 通过；真实 rc.1 / rc.2 双版本契约矩阵仍需固定官方源码，未在本轮执行。
 
 ## [0.9.2] - 2026-11-14
 
@@ -214,12 +219,14 @@
 
 ## 链接
 
+- [0.9.3 发布页][0.9.3]
 - [0.9.2 发布页][0.9.2]
 - [0.9.1 发布页][0.9.1]
 - [0.9.0 发布页][0.9.0]
 - [Keep a Changelog]
 - [语义化版本]
 
+[0.9.3]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.3
 [0.9.2]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kiritoko1029/dsh-multi-agent/releases/tag/v0.9.0

@@ -1,8 +1,8 @@
-# DSH 多 Agent 派发 0.9.2 — 安装与安全说明
+# DSH 多 Agent 派发 0.9.3 — 安装与安全说明
 
-本项目不是 DSH 官方插件。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)；0.9.2 未追溯发布到 npm，请从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载 `dsh-multi-agent-0.9.2.tgz` 及其 `.sha256` 校验文件。后续新版本会由 Release 工作流同步到 npm 包 `@kiritoko1029/dsh-multi-agent`，但 DSH 安装仍按本文使用插件管理器，不要在 profile 目录手动执行 npm / pnpm 安装。
+本项目不是 DSH 官方插件。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)；0.9.3 起使用 scoped npm 包 `@kiritoko1029/dsh-multi-agent`，请从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载 `kiritoko1029-dsh-multi-agent-0.9.3.tgz` 及其 `.sha256` 校验文件。npm 发布不改变 DSH 安装方式：仍按本文使用插件管理器，不要在 profile 目录手动执行 npm / pnpm 安装。0.9.2 及更早版本不追溯发布到 npm。
 
-后续 scoped 包的 Release 资产名为 `kiritoko1029-dsh-multi-agent-<version>.tgz`。包名同时也是插件安装身份；从旧 `dsh-multi-agent` 升级时应先备份配置并按插件管理器提示处理旧包，不要让新旧两个包同时启用。既有 0.9.2 资产名和安装方式不变。
+0.9.3 的 Release 资产名为 `kiritoko1029-dsh-multi-agent-0.9.3.tgz`。包名同时也是插件安装身份；从旧 `dsh-multi-agent` 升级时应先备份配置并按插件管理器提示处理旧包，不要让新旧两个包同时启用。既有 0.9.2 资产名和安装方式不变。
 
 ## 一、准备环境
 
@@ -23,14 +23,14 @@
 
 1. 记录或备份当前插件设置（模型、CLI 路径、路由规则、权限策略）。
 2. 在 DSH 插件管理器中卸载旧的 `@local/dsh-multi-agent` bundle；不要清空整个 profile，也不要删除整个 `.dsh`。
-3. 安装 Releases 中的 `dsh-multi-agent-0.9.2.tgz`，按管理器提示应用或重启 DSH。
+3. 安装 Releases 中的 `kiritoko1029-dsh-multi-agent-0.9.3.tgz`，按管理器提示应用或重启 DSH。
 4. 重新核对顶栏“多 Agent 派发”面板：包名变化后旧设置键不会自动迁移，请按第 1 步的记录重新填写，再确认每个 Agent 的权限策略符合预期。
 
 若 0.8.6 曾导致标准 / PTC / 创造模式失败，0.9.0 已包含 0.8.7 的宿主依赖隔离修复，升级后完全重启 DSH 即可；不要为恢复而删除整个 `.dsh`。旧版 profile 若保留 `disabled: !!js ...` 条件覆盖，会继续绕过新版默认，升级时只清理这三个 Provider 的旧动态 disabled 覆盖，保留模型、命令、权限和其他插件设置，无需删除整份 `cordis.patch.yml`。
 
 ## 二、首次安装（推荐）
 
-从 Releases 页面下载 `dsh-multi-agent-0.9.2.tgz`，需要时一并下载 `.sha256` 校验文件：在 macOS / Linux 上执行 `shasum -a 256 -c dsh-multi-agent-0.9.2.tgz.sha256` 即可核对传输完整性（该校验值不是数字签名，也不能独立证明来源可信）。TGZ 本身就是插件安装包，不需要先解开。
+从 Releases 页面下载 `kiritoko1029-dsh-multi-agent-0.9.3.tgz`，需要时一并下载 `.sha256` 校验文件：在 macOS / Linux 上执行 `shasum -a 256 -c kiritoko1029-dsh-multi-agent-0.9.3.tgz.sha256` 即可核对传输完整性（该校验值不是数字签名，也不能独立证明来源可信）。TGZ 本身就是插件安装包，不需要先解开。
 
 把 TGZ 文件或它在 DSH 所在电脑上的绝对路径交给 DSH，并发送：
 

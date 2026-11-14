@@ -13,7 +13,7 @@ npm 包为 [`@kiritoko1029/dsh-multi-agent`](https://www.npmjs.com/package/@kiri
 
 发布工作流通过 GitHub OIDC 换取 npm 短期凭证，不配置 `NPM_TOKEN`，也不在仓库、workflow 日志或插件配置中保存长期 npm 令牌。`publish-npm` 任务显式安装 npm `11.20.0`，满足 Trusted Publishing 所需的 npm 11.5.1+，并使用包含后续修复的 11.x 版本。
 
-`0.9.3-stage.0` 仅用于建立 npm 包与 Trusted Publisher 的引导关系。该暂存版本未公开，不是稳定插件发行版，也不应作为安装来源。
+`0.9.3-stage.0` 仅用于建立 npm 包与 Trusted Publisher 的引导关系。它是预发布版本，不是稳定插件发行版，也不应作为稳定安装来源。
 
 ## 正常发布步骤
 
@@ -55,6 +55,6 @@ Trusted Publisher、OIDC 或仓库绑定配置错误时，GitHub Release 可能�
 
 ## 分发边界
 
-后续包名为 `@kiritoko1029/dsh-multi-agent`，`npm pack` 生成的 Release 资产名为 `kiritoko1029-dsh-multi-agent-<version>.tgz`。既有 0.9.2 的 `dsh-multi-agent-0.9.2.tgz` 资产名不变。
+0.9.3 起包名为 `@kiritoko1029/dsh-multi-agent`，`npm pack` 生成的 Release 资产名为 `kiritoko1029-dsh-multi-agent-<version>.tgz`。既有 0.9.2 的 `dsh-multi-agent-0.9.2.tgz` 资产名不变。
 
 0.9.2 及更早版本保持原有 GitHub Release 分发，不追溯发布到 npm。npm 发布不改变 DSH 安装方式：用户仍通过插件管理器安装 TGZ，不在 profile 目录手动执行 npm / pnpm 安装。
