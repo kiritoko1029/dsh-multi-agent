@@ -301,6 +301,9 @@ function setup(options = {}) {
       calls.push(owner)
       catalogRequests.push(url)
       if (options.catalogFailure === owner) throw new Error('private diagnostic must not enter UI')
+      if (options.catalogReason?.[owner]) {
+        return { ok: true, json: async () => ({ ok: false, error: { code: 'catalog', reason: options.catalogReason[owner], message: 'Model catalog is unavailable' } }) }
+      }
       return { ok: true, json: async () => ({ ok: true, value: catalogs[owner] }) }
     },
   })
@@ -518,6 +521,7 @@ test('invalid JSON prevents writes; failed catalog does not prevent manual selec
   const app = setup({ catalogFailure: 'codex' })
   await app.load()
   assert.ok(JSON.stringify(app.render()).includes('common.modelsError'))
+  assert.ok(JSON.stringify(app.render()).includes('common.modelsErrorReason.unavailable'))
   assert.ok(!JSON.stringify(app.render()).includes('private diagnostic'))
   app.edit('acp.env', '{bad json')
   await app.save()
@@ -527,6 +531,38 @@ test('invalid JSON prevents writes; failed catalog does not prevent manual selec
   await app.save()
   assert.equal(app.snapshots.acp.value.env.REGION, 'cn')
   assert.equal(app.writes.codex.length, 1)
+  app.dispose()
+})
+
+test('catalog failures state an actionable reason without leaking CLI output', async () => {
+  const app = setup({ catalogReason: { agy: 'auth' } })
+  const tree = await app.load()
+  const rendered = JSON.stringify(tree)
+  assert.ok(rendered.includes('common.modelsError'))
+  assert.ok(rendered.includes('common.modelsErrorReason.auth'))
+  assert.ok(!rendered.includes('private diagnostic'))
+  assert.equal(control(tree, 'agy.model').props.value, 'agy/gemini-test')
+  app.dispose()
+})
+
+test('proxy settings default to the system proxy and validate a custom address', async () => {
+  const app = setup()
+  let tree = await app.load()
+  assert.equal(control(tree, 'agy.proxyMode').props.value, 'system')
+  assert.equal(control(tree, 'agy.proxyUrl'), undefined)
+  app.edit('agy.proxyMode', 'custom')
+  tree = app.render()
+  assert.equal(control(tree, 'agy.proxyUrl').props.value, '')
+  app.edit('agy.proxyUrl', 'not a url')
+  await app.save()
+  assert.equal(app.writes.agy.length, 0)
+  assert.ok(JSON.stringify(app.render()).includes('common.invalidProxyUrl'))
+  app.edit('agy.proxyUrl', '127.0.0.1:7890')
+  await app.save()
+  assert.deepEqual(app.writes.agy[0].ops, [
+    { op: 'set', path: ['proxyMode'], value: 'custom' },
+    { op: 'set', path: ['proxyUrl'], value: '127.0.0.1:7890' },
+  ])
   app.dispose()
 })
 

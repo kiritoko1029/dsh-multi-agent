@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { agyCatalogFromSession, codexCatalogFromOutput, kimiCatalogFromOutput, registerModelCatalogRoute, runCatalogCommand } from '../lib/model-catalog-route.js'
+import { agyCatalogFromSession, catalogFailureReason, codexCatalogFromOutput, kimiCatalogFromOutput, registerModelCatalogRoute, runCatalogCommand } from '../lib/model-catalog-route.js'
 
 test('Codex catalog uses public slugs and display names', () => {
   const result = codexCatalogFromOutput(JSON.stringify({ models: [
@@ -65,6 +65,30 @@ test('catalog route returns JSON headers and owner-only model data', async () =>
   assert.equal(response.status, 200)
   assert.equal(response.headers['content-type'], 'application/json; charset=utf-8')
   assert.deepEqual(JSON.parse(response.body), { ok: true, value: { groups: [], failures: [] } })
+})
+
+test('catalog failures are classified for the UI without echoing CLI output', async () => {
+  assert.equal(catalogFailureReason(new Error('Authentication required')), 'auth')
+  assert.equal(catalogFailureReason(new Error('You are not logged in')), 'auth')
+  assert.equal(catalogFailureReason(new Error('ACP catalog probe timed out')), 'timeout')
+  assert.equal(catalogFailureReason(new Error('spawn agy ENOENT')), 'missing')
+  assert.equal(catalogFailureReason(new Error('Model catalog command failed')), 'unavailable')
+  let route
+  const ctx = {
+    effect: (callback) => callback(),
+    webServer: { register: (value) => { route = value; return () => {} } },
+    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    logger: { warn() {} },
+  }
+  registerModelCatalogRoute(ctx, 'agy', async () => { throw new Error('Authentication required for C:\\secret\\agy.exe') })
+  const response = {
+    writeHead(status, headers) { this.status = status; this.headers = headers },
+    end(body) { this.body = body },
+  }
+  await route.handler({ method: 'GET' }, response)
+  assert.equal(response.status, 200)
+  assert.deepEqual(JSON.parse(response.body), { ok: false, error: { code: 'catalog', reason: 'auth', message: 'Model catalog is unavailable' } })
+  assert.ok(!response.body.includes('secret'))
 })
 
 test('catalog commands use argv without a shell and collect bounded stdout', async () => {

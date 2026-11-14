@@ -3,8 +3,12 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { apply as applyOfficial } from '@deepseek-ai/dsh-subagent-codex'
 import { apply, Config, inject, name } from '../codex-provider.js'
+import { setSystemProxyReader } from '../lib/proxy.js'
 import { runWithTaskTrace } from '../task-monitor.js'
 import { codexWrapperArgv } from '../lib/codex-command.js'
+
+// Keep proxy injection deterministic: no host registry lookup during tests.
+setSystemProxyReader(() => undefined)
 
 const CODEX_APP_SERVER_SOURCE = `
 let input = ''

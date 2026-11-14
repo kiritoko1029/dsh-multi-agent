@@ -8,6 +8,7 @@ import { createCodexObservationStream } from './lib/task-monitor-codex.js'
 import { applyCodexProvider, codexAppServerEnv } from './lib/codex-run.js'
 import { bundledCodexExecutable, codexWrapperArgv } from './lib/codex-command.js'
 import { assertDirectCommand } from './lib/process-command.js'
+import { PROXY_MODES, withProxyEnvironment } from './lib/proxy.js'
 import { currentTaskTrace } from './task-monitor.js'
 
 const DEFAULT_PROVIDER_NAME = 'codex-router'
@@ -24,6 +25,8 @@ export const Config = z.object({
   model: z.string().min(1).volatile(),
   reasoningEffort: z.string().min(1).volatile(),
   env: z.dict(z.string()).default({}).volatile(),
+  proxyMode: z.union(PROXY_MODES).default('system').volatile(),
+  proxyUrl: z.string().volatile(),
   permissionPolicy: z.union(PERMISSION_POLICIES).default('main-session').volatile(),
   subagentPermissionMode: z.union(SUBAGENT_PERMISSION_MODES).default('auto').volatile(),
   permissionMode: z.union([
@@ -164,11 +167,17 @@ export function apply(ctx, config, applyOfficial, runtime = {}) {
     throw new Error('codex-provider: providerName "codex" is reserved for the official provider')
   }
 
+  // The proxy applies to both the app-server child and the catalog command.
+  const providerEnvironment = () => withProxyEnvironment(
+    currentValue(config.env),
+    currentValue(config.proxyMode),
+    currentValue(config.proxyUrl),
+  )
   const readConfig = () => ({
     // The compatibility seam still accepts only the official provider's settings.
     ...applyOfficial ? {} : { command },
     model: currentValue(config.model),
-    env: currentValue(config.env) ?? {},
+    env: providerEnvironment(),
     permissionPolicy: currentValue(config.permissionPolicy) ?? 'main-session',
     subagentPermissionMode: currentValue(config.subagentPermissionMode) ?? 'auto',
     permissionMode: currentValue(config.permissionMode) ?? 'approve-for-me',
@@ -212,7 +221,7 @@ export function apply(ctx, config, applyOfficial, runtime = {}) {
     throw new Error('codex-provider: incompatible official apply(); expected exactly one provider registration')
   }
   registerModelCatalogRoute(ctx, 'codex', async () => {
-    const environment = currentValue(config.env) ?? {}
+    const environment = providerEnvironment()
     const liveDetectedCommand = availability?.codexCommand?.trim() || undefined
     const catalogCommand = manualCommand ?? liveDetectedCommand ?? command
     const argv = catalogCommand

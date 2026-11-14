@@ -3,7 +3,11 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { apply, Config, inject, AcpProvider } from '../acp-provider.js'
 import { createPermissionAsker } from '../lib/permission-policy.js'
+import { setSystemProxyReader } from '../lib/proxy.js'
 import { runWithTaskTrace } from '../task-monitor.js'
+
+// Keep proxy injection deterministic: no host registry lookup during tests.
+setSystemProxyReader(() => undefined)
 
 const ACP_AGENT_SOURCE = `
 let input = ''

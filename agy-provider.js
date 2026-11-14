@@ -4,6 +4,7 @@ import { currentValue, dynamicAcpConfig } from './lib/config.js'
 import { PERMISSION_POLICIES, SUBAGENT_PERMISSION_MODES } from './lib/permission-policy.js'
 import { agyCatalogFromSession, registerModelCatalogRoute } from './lib/model-catalog-route.js'
 import { assertDirectCommand, commandEnvironment, hasEnvironmentKey } from './lib/process-command.js'
+import { PROXY_MODES, proxyEnvironment } from './lib/proxy.js'
 import { resolveExecutable } from './availability.js'
 
 export const name = 'agy-provider'
@@ -16,6 +17,8 @@ export const Config = z.object({
   permission: z.union(PERMISSION_POLICIES).default('main-session').volatile(),
   subagentPermissionMode: z.union(SUBAGENT_PERMISSION_MODES).default('auto').volatile(),
   env: z.dict(z.string()).default({}).volatile(),
+  proxyMode: z.union(PROXY_MODES).default('system').volatile(),
+  proxyUrl: z.string().volatile(),
   model: z.string().min(1).volatile(),
   reasoningEffort: z.string().min(1).volatile(),
   disposeEofGraceMs: z.number().min(1).max(2147483647).default(6000).volatile(),
@@ -81,7 +84,10 @@ export function apply(ctx, config) {
     return
   }
   assertDirectCommand(command)
-  const resolved = dynamicAcpConfig(config)
+  const resolved = dynamicAcpConfig(config, () => proxyEnvironment(
+    currentValue(config.proxyMode),
+    currentValue(config.proxyUrl),
+  ))
   Object.defineProperty(resolved, 'command', {
     enumerable: true,
     get: () => selectAgyCommand(config, availability),

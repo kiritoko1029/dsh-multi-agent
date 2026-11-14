@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -13,7 +13,9 @@ const dist = join(root, 'dist')
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const slug = manifest.name.replace(/^@/, '').replace(/\//g, '-')
 const expected = `${slug}-${manifest.version}.tgz`
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+// Node refuses to spawn a .cmd file without a shell (EINVAL since the
+// CVE-2024-27980 fix), so Windows runs one quoted command through cmd.exe.
+const windows = process.platform === 'win32'
 
 mkdirSync(dist, { recursive: true })
 // Keep dist/ deterministic: stale artifacts from earlier versions must not ship.
@@ -21,7 +23,8 @@ for (const name of readdirSync(dist)) {
   if (name.endsWith('.tgz') || name.endsWith('.sha256')) rmSync(join(dist, name), { force: true })
 }
 
-execFileSync(npm, ['pack', '--pack-destination', dist], { cwd: root, stdio: 'inherit' })
+if (windows) execSync(`npm.cmd pack --pack-destination "${dist}"`, { cwd: root, stdio: 'inherit' })
+else execFileSync('npm', ['pack', '--pack-destination', dist], { cwd: root, stdio: 'inherit' })
 
 const artifact = join(dist, expected)
 if (!existsSync(artifact)) {

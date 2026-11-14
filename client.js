@@ -130,10 +130,23 @@ window.__ModuleLoader__.load({
         'common.modelPlaceholder': 'Select or enter a model',
         'common.modelsLoading': 'Loading models…',
         'common.modelsError': 'Models could not be loaded. You can still enter a model manually.',
+        'common.modelsErrorReason.auth': 'The CLI is not signed in. Sign in from a terminal first (agy: agy acp --login), then retry.',
+        'common.modelsErrorReason.timeout': 'The CLI did not answer in time. Retry, or check that it starts normally in a terminal.',
+        'common.modelsErrorReason.missing': 'The CLI executable was not found. Enter its absolute path under Runtime options.',
+        'common.modelsErrorReason.forbidden': 'Model list access was refused. Open this page from the local DSH app.',
+        'common.modelsErrorReason.unavailable': 'The CLI returned no model catalog. Check its version, or enter a model manually.',
         'common.modelsPartial': 'Some model providers could not be loaded; other suggestions remain available.',
         'common.modelsReady': 'Model suggestions loaded. Manual entries are also allowed.',
         'common.retryModels': 'Retry model list',
         'common.commandPlaceholder': 'Leave blank for auto-detection, or enter an absolute CLI path',
+        'common.proxyMode': 'Network proxy',
+        'common.proxyMode.system': 'Follow system proxy',
+        'common.proxyMode.none': 'No proxy',
+        'common.proxyMode.custom': 'Custom address',
+        'common.proxyUrl': 'Proxy address',
+        'common.proxyUrlPlaceholder': 'http://127.0.0.1:7890',
+        'common.proxyHint': 'External CLIs read only environment proxies. "Follow system proxy" injects the OS proxy as HTTP(S)_PROXY; a custom address overrides it.',
+        'common.invalidProxyUrl': 'Enter a proxy address such as http://127.0.0.1:7890.',
         'header.tooltip': 'Open multi-agent dispatch settings',
         'modal.close': 'Close',
         'modal.closeAria': 'Close multi-agent dispatch settings',
@@ -273,10 +286,23 @@ window.__ModuleLoader__.load({
         'common.modelPlaceholder': '选择或手动输入模型',
         'common.modelsLoading': '正在读取模型列表…',
         'common.modelsError': '模型列表读取失败，仍可手动输入模型。',
+        'common.modelsErrorReason.auth': 'CLI 未登录：请先在终端登录（agy 运行 agy acp --login），再点重试。',
+        'common.modelsErrorReason.timeout': 'CLI 响应超时：请重试，或确认它能在终端正常启动。',
+        'common.modelsErrorReason.missing': '找不到 CLI 可执行文件：请在「运行参数」中填写绝对路径。',
+        'common.modelsErrorReason.forbidden': '无权读取模型列表：请从本机 DSH 页面打开设置。',
+        'common.modelsErrorReason.unavailable': 'CLI 未返回模型目录：请检查版本，或手动输入模型。',
         'common.modelsPartial': '部分 Provider 读取失败，其他模型建议仍可使用。',
         'common.modelsReady': '模型建议已读取，也可手动输入。',
         'common.retryModels': '重新读取模型列表',
         'common.commandPlaceholder': '留空自动检测，或填写 CLI 的绝对路径',
+        'common.proxyMode': '网络代理',
+        'common.proxyMode.system': '跟随系统代理',
+        'common.proxyMode.none': '不使用代理',
+        'common.proxyMode.custom': '自定义地址',
+        'common.proxyUrl': '代理地址',
+        'common.proxyUrlPlaceholder': 'http://127.0.0.1:7890',
+        'common.proxyHint': '外部 CLI 只认环境变量代理：「跟随系统代理」会把系统代理注入 HTTP(S)_PROXY，自定义地址则覆盖它。',
+        'common.invalidProxyUrl': '代理地址需形如 http://127.0.0.1:7890。',
         'header.tooltip': '打开多 Agent 派发设置',
         'modal.close': '关闭',
         'modal.closeAria': '关闭多 Agent 派发设置',
@@ -442,6 +468,19 @@ window.__ModuleLoader__.load({
             if (env === null || typeof env !== 'object' || Array.isArray(env) || Object.values(env).some((item) => typeof item !== 'string')) throw validationError('common.invalidEnv', field)
             return { op: 'set', path: [field], value: env }
           }
+          if (field === 'proxyMode') {
+            if (!['system', 'none', 'custom'].includes(value)) throw validationError('common.failure', field)
+            return { op: 'set', path: [field], value }
+          }
+          if (field === 'proxyUrl') {
+            if (typeof value !== 'string') throw validationError('common.invalidProxyUrl', field)
+            const address = value.trim()
+            if (address === '') return { op: 'unset', path: [field] }
+            // The Client sandbox has no URL constructor; accept an optional
+            // scheme plus host[:port] and let the Host normalise it.
+            if (!/^(?:[a-z][a-z0-9+.-]*:\/\/)?[a-z0-9.-]+(?::\d{1,5})?\/?$/i.test(address)) throw validationError('common.invalidProxyUrl', field)
+            return { op: 'set', path: [field], value: address }
+          }
           if (field === 'routes') {
             if (!Array.isArray(value) || value.length === 0) throw validationError('common.routesRequired', field)
             const routes = value.map((route) => ({ agent: route.agent, prompt: typeof route.prompt === 'string' ? route.prompt.trim() : '' }))
@@ -509,11 +548,13 @@ window.__ModuleLoader__.load({
         }))))
     }
 
+    const CATALOG_REASONS = new Set(['auth', 'timeout', 'missing', 'forbidden', 'unavailable'])
+
     function CatalogStatus({ catalog, onRetry, t }) {
       if (catalog.status === 'loading') return h('p', { className: 'ma-catalog', role: 'status' }, t('common.modelsLoading'))
       if (catalog.status === 'error') return h('p', { className: 'ma-catalog', role: 'status' },
         h('span', null, t('common.modelsError')),
-        catalog.message ? h('span', { className: 'ma-error' }, catalog.message) : null,
+        h('span', { className: 'ma-error' }, t(`common.modelsErrorReason.${CATALOG_REASONS.has(catalog.reason) ? catalog.reason : 'unavailable'}`)),
         h('button', { name: 'retry-models', type: 'button', onClick: onRetry }, t('common.retryModels')))
       return h('p', { className: 'ma-catalog', role: 'status' },
         t(catalog.failures.length > 0 ? 'common.modelsPartial' : 'common.modelsReady'))
@@ -736,8 +777,8 @@ window.__ModuleLoader__.load({
         try {
           const value = await loadCatalogs[key]()
           update({ status: 'ready', groups: value.groups ?? [], failures: value.failures ?? [] })
-        } catch {
-          update({ status: 'error', groups: [], failures: [] })
+        } catch (error) {
+          update({ status: 'error', groups: [], failures: [], reason: error?.reason ?? 'unavailable' })
         }
       }
       useEffect(() => {
@@ -916,6 +957,25 @@ window.__ModuleLoader__.load({
             h(Field, { name: `${owner}.command`, label: t(`${owner}.command`), placeholder: t('common.commandPlaceholder'), value: get(`${owner}.command`, ''), onChange: (next) => change(`${owner}.command`, next) })),
           h(CatalogStatus, { catalog: catalogs[owner], onRetry: () => reloadCatalog(owner), t }))
       }
+      const proxyFields = (owner) => {
+        const mode = get(`${owner}.proxyMode`, 'system')
+        const urlField = `${owner}.proxyUrl`
+        return [
+          h(Select, {
+            name: `${owner}.proxyMode`, label: t('common.proxyMode'), value: mode,
+            onChange: (next) => {
+              change(`${owner}.proxyMode`, next)
+              // A custom address only applies to custom mode; drop unsaved leftovers.
+              if (next !== 'custom') discardEdit(urlField)
+            },
+            options: ['system', 'none', 'custom'].map((value) => ({ value, label: t(`common.proxyMode.${value}`) })),
+          }),
+          ...(mode === 'custom' ? [h(Field, {
+            name: urlField, label: t('common.proxyUrl'), placeholder: t('common.proxyUrlPlaceholder'),
+            value: get(urlField, ''), onChange: (next) => change(urlField, next),
+          })] : []),
+        ]
+      }
       const permissionPolicyFields = (owner, field = 'permission') => {
         const policy = get(`${owner}.${field}`, 'main-session')
         const modeField = `${owner}.subagentPermissionMode`
@@ -937,9 +997,11 @@ window.__ModuleLoader__.load({
           !available ? h('p', { role: 'status' }, t('unified.disabled')) : null,
           h('div', { className: 'ma-fields' },
             ...permissionPolicyFields(owner),
+            ...proxyFields(owner),
             h(Field, { name: `${owner}.disposeEofGraceMs`, label: t(`${owner}.disposeEofGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeEofGraceMs`, 6000), onChange: (next) => change(`${owner}.disposeEofGraceMs`, next) }),
             h(Field, { name: `${owner}.disposeGraceMs`, label: t(`${owner}.disposeGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeGraceMs`, 3000), onChange: (next) => change(`${owner}.disposeGraceMs`, next) })),
           h('p', null, t(`${owner}.permissionWarning`)),
+          h('p', null, t('common.proxyHint')),
           h('div', { className: 'ma-two-col' },
             h(TextArea, { name: `${owner}.args`, className: 'ma-code', label: t(`${owner}.args`), value: getJson(`${owner}.args`, ['acp']), onChange: (next) => change(`${owner}.args`, next) }),
             h('div', { className: 'ma-field' },
@@ -1065,8 +1127,10 @@ window.__ModuleLoader__.load({
                       h('div', { className: 'ma-fields' },
                         ...permissionPolicyFields('codex', 'permissionPolicy'),
                         h(Select, { name: 'codex.permissionMode', label: t('codex.permissionMode'), value: get('codex.permissionMode', 'approve-for-me'), onChange: (next) => change('codex.permissionMode', next), options: ['never', 'approve-for-me', 'dangerously-bypass-approvals-and-sandbox'].map((mode) => ({ value: mode, label: t(`codex.permissionMode.${mode}`) })) }),
+                        ...proxyFields('codex'),
                         h(Field, { name: 'codex.disposeGraceMs', label: t('codex.disposeGraceMs'), type: 'number', min: 1, max: 2147483647, step: 1, value: get('codex.disposeGraceMs', 3000), onChange: (next) => change('codex.disposeGraceMs', next) })),
                       h('p', null, t('codex.permissionWarning')),
+                      h('p', null, t('common.proxyHint')),
                       h(TextArea, { name: 'codex.env', className: 'ma-code', label: t('codex.env'), value: getJson('codex.env', {}), onChange: (next) => change('codex.env', next) })),
                     acpRuntimeCard('acp', 'Kimi Code'),
                     acpRuntimeCard('agy', t('agy.title')))) : null)))),
@@ -1187,8 +1251,12 @@ window.__ModuleLoader__.load({
 
     async function loadExternalCatalog(kind) {
       const response = await fetch(`/multi-agent/model-catalog/${kind}`, { credentials: 'same-origin' })
-      const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error?.detail || payload.error?.message || 'catalog-unavailable')
+      const payload = await response.json().catch(() => undefined)
+      if (!response.ok || !payload?.ok) {
+        const error = new Error('catalog-unavailable')
+        error.reason = payload?.error?.reason ?? (response.status === 403 ? 'forbidden' : 'unavailable')
+        throw error
+      }
       return payload.value
     }
 
@@ -1208,7 +1276,11 @@ window.__ModuleLoader__.load({
         const loadCatalogs = {
           dsh: async () => {
             const response = await ctx.remote.session.modelCatalog()
-            if (!response.ok) throw new Error('catalog-unavailable')
+            if (!response.ok) {
+              const error = new Error('catalog-unavailable')
+              error.reason = 'unavailable'
+              throw error
+            }
             return response.value
           },
           codex: () => loadExternalCatalog('codex'),

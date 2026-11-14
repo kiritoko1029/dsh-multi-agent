@@ -6,7 +6,11 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { apply } from '../codex-provider.js'
+import { setSystemProxyReader } from '../lib/proxy.js'
 import { runWithTaskTrace } from '../task-monitor.js'
+
+// Keep proxy injection deterministic: no host registry lookup during tests.
+setSystemProxyReader(() => undefined)
 
 const require = createRequire(import.meta.url)
 const codexPackagePath = require.resolve('@openai/codex/package.json')

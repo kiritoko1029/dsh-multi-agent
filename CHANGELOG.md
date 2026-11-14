@@ -2,6 +2,24 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
+## [0.9.4] - 2026-11-14
+
+### 新增
+
+- 三个外部 Provider（Codex、Kimi Code、Antigravity）新增网络代理配置：`proxyMode` 默认 `system`，读取 Windows Internet Settings / macOS `scutil --proxy` 并注入 `HTTP(S)_PROXY` 与 `NO_PROXY`；`none` 写入 `NO_PROXY=*` 忽略继承代理；`custom` 通过 `proxyUrl` 填写自有地址。Provider `env` 中的同名变量优先，目录查询与任务共用同一份设置。
+- 顶栏面板“运行参数”新增代理模式下拉与自定义地址输入，保存前校验地址格式，中英文文案同步。
+- 模型目录失败原因按 `auth` / `timeout` / `missing` / `forbidden` / `unavailable` 分类返回，面板显示对应排查提示；原始错误文本只写 Host 日志，不进入 UI。
+
+### 修复
+
+- Go 编写的外部 CLI（agy）不读取 Windows/macOS 系统代理，导致已登录时模型目录与任务请求仍然超时；默认 `system` 代理设置修复该场景。
+- `release:pack` 在 Node 20.12+/Windows 上因 `npm.cmd` 无法直接 spawn 而报 `EINVAL`；Windows 改为通过一条带引号的命令调用，CI 的 Linux 路径不变。
+
+### 测试
+
+- 新增 `test/proxy.test.mjs`：注册表与 `scutil` 解析、30 秒缓存、三种代理模式、地址归一化与显式 `env` 优先级。
+- 新增客户端代理字段与目录失败原因用例；`setSystemProxyReader` 让 Provider 测试不再依赖本机系统代理。
+
 ## [0.9.3] - 2026-11-14
 
 ### 新增

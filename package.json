@@ -1,6 +1,6 @@
 {
   "name": "@kiritoko1029/dsh-multi-agent",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

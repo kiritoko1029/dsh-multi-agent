@@ -8,6 +8,7 @@ import { createPermissionAsker, normalizePermissionPolicy, normalizeSubagentPerm
 import { kimiCatalogFromOutput, registerModelCatalogRoute, runCatalogCommand } from './lib/model-catalog-route.js'
 import { sameDirectory } from './lib/path-compat.js'
 import { assertDirectCommand, commandEnvironment, hasEnvironmentKey } from './lib/process-command.js'
+import { PROXY_MODES, proxyEnvironment } from './lib/proxy.js'
 import { resolveExecutable } from './availability.js'
 import { acpConfigTelemetry, acpUsage, modelTelemetry } from './lib/task-telemetry.js'
 
@@ -50,6 +51,8 @@ export const Config = z.object({
   permission: z.union(PERMISSION_POLICIES).default('main-session').volatile(),
   subagentPermissionMode: z.union(SUBAGENT_PERMISSION_MODES).default('auto').volatile(),
   env: z.dict(z.string()).default({}).volatile(),
+  proxyMode: z.union(PROXY_MODES).default('system').volatile(),
+  proxyUrl: z.string().volatile(),
   model: z.string().min(1).volatile(),
   reasoningEffort: z.string().min(1).volatile(),
   disposeEofGraceMs: z.number().min(1).max(2147483647).default(DEFAULT_DISPOSE_EOF_GRACE_MS).volatile(),
@@ -820,7 +823,10 @@ export function apply(ctx, config) {
     return
   }
   assertDirectCommand(command)
-  const resolved = dynamicAcpConfig(config)
+  const resolved = dynamicAcpConfig(config, () => proxyEnvironment(
+    currentValue(config.proxyMode),
+    currentValue(config.proxyUrl),
+  ))
   Object.defineProperty(resolved, 'command', {
     enumerable: true,
     get: () => selectAcpCommand(config, availability, 'kimi'),

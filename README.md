@@ -119,6 +119,8 @@ DSH Subagent Manager
 
 模型目录读取失败时可点击重试，或直接手动输入模型；不会因目录不可用而清空已有配置或阻止保存。
 
+外部 CLI 只读取环境变量代理，不读取 Windows/macOS 的系统代理设置。每个 Provider 在“运行参数”中提供 `proxyMode`：`system`（默认，读取系统代理并注入 `HTTP(S)_PROXY` 与 `NO_PROXY`）、`none`（写入 `NO_PROXY=*`，忽略继承的代理）和 `custom`（填写 `http://127.0.0.1:7890` 这类地址）。Provider `env` 中的同名变量优先于注入值。Windows 读取当前用户 Internet Settings，macOS 读取 `scutil --proxy`，结果缓存 30 秒；系统未启用代理时不注入任何变量。
+
 ### Multi-agent router / 多 Agent 派发
 
 - `selectionMode`
@@ -171,6 +173,7 @@ DSH Subagent Manager
 - `permission`：子代理权限请求策略，默认 `main-session`（主会话审批），选项与 Kimi 相同（`main-session` / `human` / `allow` / `reject` / `subagent`）。继承主会话“不再询问 + 完全权限”时，agy 会追加原生 `--dangerously-skip-permissions`；Kimi 没有公开跳过参数，通过自动允许其 ACP 权限申请实现。
 - `subagentPermissionMode`：子代理控制等级。agy 与 Kimi 的差异在 `full-access`：agy 会追加原生 `--dangerously-skip-permissions` 启动参数，彻底交由其内部权限体系；其余等级语义一致。
 - `env` 与退出宽限参数：语义与 Kimi ACP 相同；已有登录无需额外填写密钥。
+- `proxyMode` / `proxyUrl`：agy 是 Go 程序，只认 `HTTP(S)_PROXY` 环境变量，不读系统代理。默认 `system` 会把系统代理注入子进程；`custom` 可填自己的地址（如 `http://127.0.0.1:7890`）。目录查询与任务使用同一份代理设置。
 - 可在路由规则、默认 Agent 中选择 `agy`，或直接调用 `dispatch_agent` 并指定 `agent: "agy"`。结果、工具活动和报告进入同一任务面板。
 - 完成后的任务通过 `continue_agent` 复用原 ACP 会话。agy 使用 `session/load` 检查原用户或助手历史是否存在；缺少加载能力或历史为空时在发送新任务前拒绝，不静默新建会话。原生数据库锁等原因可能导致 CLI 未保存历史，适配器不会修复或改写 CLI 数据库。历史回放不混入当前任务正文。
 

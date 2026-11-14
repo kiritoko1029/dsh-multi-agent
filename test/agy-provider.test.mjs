@@ -2,7 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { apply, Config, inject, name } from '../agy-provider.js'
+import { setSystemProxyReader } from '../lib/proxy.js'
 import { runWithTaskTrace } from '../task-monitor.js'
+
+// Keep proxy injection deterministic: no host registry lookup during tests.
+setSystemProxyReader(() => undefined)
 
 const ACP_AGENT_SOURCE = `
 let input = ''
@@ -108,7 +112,7 @@ function spawnAcpChild(spec) {
   }
 }
 
-function harness({ model: initialModel, reasoningEffort: initialEffort, available = true, env = {}, manualCommand, permission = 'allow', parent, permissionPresets, sandboxPolicy, approval } = {}) {
+function harness({ model: initialModel, reasoningEffort: initialEffort, available = true, env = {}, proxyMode, proxyUrl, manualCommand, permission = 'allow', parent, permissionPresets, sandboxPolicy, approval } = {}) {
   let model = initialModel
   let reasoningEffort = initialEffort
   const state = { observations: [], saved: [], warnings: [], spawns: [] }
@@ -118,6 +122,8 @@ function harness({ model: initialModel, reasoningEffort: initialEffort, availabl
     args: ['--eval', ACP_AGENT_SOURCE],
     permission,
     env,
+    proxyMode,
+    proxyUrl,
     model: { get: () => model },
     reasoningEffort: { get: () => reasoningEffort },
     disposeEofGraceMs: 1000,
@@ -183,9 +189,24 @@ test('agy provider exports independent volatile ACP configuration', () => {
   assert.equal(Config({ reasoningEffort: 'high' }).reasoningEffort.get(), 'high')
   assert.throws(() => Config({ providerName: 'kimi-code' }), /providerName/)
   const schema = Config.toJSON()
-  for (const field of ['command', 'args', 'permission', 'env', 'model', 'reasoningEffort', 'disposeEofGraceMs', 'disposeGraceMs']) {
+  for (const field of ['command', 'args', 'permission', 'env', 'proxyMode', 'proxyUrl', 'model', 'reasoningEffort', 'disposeEofGraceMs', 'disposeGraceMs']) {
     assert.equal(schema.refs[schema.refs[schema.uid].dict[field]].meta.volatile, true)
   }
+})
+
+test('agy injects the configured proxy into the child environment', async () => {
+  const agent = harness({ proxyMode: 'custom', proxyUrl: 'http://10.0.0.2:8080' })
+  await agent.run()
+  assert.equal(agent.state.spawns[0].env.HTTPS_PROXY, 'http://10.0.0.2:8080')
+  assert.equal(agent.state.spawns[0].env.HTTP_PROXY, 'http://10.0.0.2:8080')
+  assert.equal(agent.state.spawns[0].env.NO_PROXY, 'localhost,127.0.0.1')
+})
+
+test('agy bypasses an inherited proxy when the proxy mode is none', async () => {
+  const agent = harness({ proxyMode: 'none' })
+  await agent.run()
+  assert.equal(agent.state.spawns[0].env.NO_PROXY, '*')
+  assert.equal(agent.state.spawns[0].env.HTTPS_PROXY, undefined)
 })
 
 test('unavailable agy skips provider and model catalog registration', () => {
