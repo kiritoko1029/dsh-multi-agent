@@ -349,17 +349,20 @@ function setup(options = {}) {
   })
 
   const headerEntry = registrations.find(({ spec }) => spec.name === 'conversation.session.header.utilities')
+  const heroEntry = registrations.find(({ spec }) => spec.name === 'conversation.hero.options')
   const overlayEntry = registrations.find(({ spec }) => spec.name === 'shell.overlay')
   const mounted = runtime.mountSlots({
     ...(headerEntry ? { header: headerEntry } : {}),
+    ...(heroEntry ? { hero: heroEntry } : {}),
     ...(overlayEntry ? { overlay: overlayEntry } : {}),
   }, doc)
 
   return {
     plugin, registrations, slotInjections, slotRegistry, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries, doc, mounted,
-    headerEntry, overlayEntry,
+    headerEntry, heroEntry, overlayEntry,
     renderAll(slotProps) { return mounted.renderAll(slotProps) },
     renderHeader() { return mounted.renderAll().header },
+    renderHero() { return mounted.renderAll().hero },
     render() { return mounted.renderAll().overlay },
     open() {
       const header = this.renderHeader()
@@ -413,7 +416,7 @@ const textOf = (tree) => {
   return (tree.children || []).map(textOf).join(' ')
 }
 
-test('removes settings.section and registers header utility and shell.overlay with no factory side effects', async () => {
+test('removes settings.section and registers header, new-session, and overlay seats with no factory side effects', async () => {
   const app = setup({ lang: 'zh' })
   assert.ok(!app.slotInjections.includes('settings.section'), 'settings.section must not be injected')
   assert.equal(app.registrations.some(({ spec }) => spec.name === 'settings.section'), false, 'settings.section must not be registered')
@@ -421,11 +424,14 @@ test('removes settings.section and registers header utility and shell.overlay wi
     app.registrations.map(({ spec }) => [spec.name, spec.id, spec.order]),
     [
       ['conversation.session.header.utilities', 'multi-agent-dispatch', 30],
+      ['conversation.hero.options', 'multi-agent-dispatch', 30],
       ['shell.overlay', 'multi-agent-dispatch', 30],
     ],
   )
   assert.equal(app.headerEntry.spec.label(), '多 Agent 派发')
+  assert.equal(app.heroEntry.spec.label(), '多 Agent 派发')
   assert.equal(app.headerEntry.spec.locale, '@kiritoko1029/dsh-multi-agent')
+  assert.equal(app.heroEntry.spec.locale, '@kiritoko1029/dsh-multi-agent')
   assert.equal(app.overlayEntry.spec.locale, '@kiritoko1029/dsh-multi-agent')
 
   const initial = app.renderAll()
@@ -437,9 +443,18 @@ test('removes settings.section and registers header utility and shell.overlay wi
   assert.equal(trigger.props['aria-expanded'], false)
   assert.match(textOf(trigger), /多 Agent 派发/)
 
+  const heroTrigger = control(initial.hero, 'multi-agent-dispatch-hero-trigger')
+  assert.ok(heroTrigger, 'new session dispatch button must exist')
+  assert.equal(heroTrigger.props['aria-label'], '多 Agent 派发')
+  assert.equal(heroTrigger.props.title, '打开多 Agent 派发设置')
+  assert.equal(heroTrigger.props['aria-haspopup'], 'dialog')
+  assert.equal(heroTrigger.props['aria-expanded'], false)
+  assert.match(textOf(heroTrigger), /多 Agent 派发/)
+
   const tree = await app.load()
   const reopenedHeader = app.renderHeader()
   assert.equal(control(reopenedHeader, 'multi-agent-dispatch-trigger').props['aria-expanded'], true)
+  assert.equal(control(app.renderHero(), 'multi-agent-dispatch-hero-trigger').props['aria-expanded'], true)
   const dialog = nodes(tree, 'div').find((node) => node.props.role === 'dialog')
   assert.ok(dialog, 'overlay must render dialog when opened')
   assert.equal(dialog.props['aria-modal'], true)
@@ -450,6 +465,23 @@ test('removes settings.section and registers header utility and shell.overlay wi
   assert.equal(control(tree, 'acp.reasoningEffort').props.value, 'max')
   assert.equal(control(tree, 'codex.model').props.value, 'gpt-test')
   assert.equal(control(tree, 'acp.args').props.value, '[\n  "acp"\n]')
+  app.dispose()
+})
+
+test('new session trigger opens and closes the shared configuration overlay', async () => {
+  const app = setup()
+  const trigger = control(app.renderHero(), 'multi-agent-dispatch-hero-trigger')
+  assert.ok(trigger, 'new session dispatch button must exist')
+  trigger.props.onClick()
+
+  const opened = app.renderAll()
+  assert.equal(control(opened.hero, 'multi-agent-dispatch-hero-trigger').props['aria-expanded'], true)
+  assert.ok(nodes(opened.overlay, 'div').some((node) => node.props.role === 'dialog'), 'new session trigger must open the configuration dialog')
+
+  app.click('modal-close')
+  assert.equal(app.render(), null, 'closing must dismiss the overlay')
+  assert.equal(control(app.renderHero(), 'multi-agent-dispatch-hero-trigger').props['aria-expanded'], false)
+  assert.equal(app.doc.listeners.keydown.size, 0, 'keydown listener must clean up after closing')
   app.dispose()
 })
 
@@ -897,8 +929,9 @@ test('loading, unavailable, and readonly states still render an accessible closa
 test('client styles use only --dsw-alias-* tokens, restore overlay pointer-events, and avoid Host DOM portals', async () => {
   const app = setup()
   const header = app.renderHeader()
+  const hero = app.renderHero()
   const overlay = await app.load()
-  const styles = [...nodes(header, 'style'), ...nodes(overlay, 'style')].map((node) => node.children.join('')).join('\n')
+  const styles = [...nodes(header, 'style'), ...nodes(hero, 'style'), ...nodes(overlay, 'style')].map((node) => node.children.join('')).join('\n')
   const cssVars = [...styles.matchAll(/var\((--[a-zA-Z0-9-]+)/g)].map((match) => match[1])
   assert.ok(cssVars.length > 0)
   assert.ok(cssVars.every((name) => name.startsWith('--dsw-alias-')), `unexpected CSS variable: ${cssVars.join(', ')}`)

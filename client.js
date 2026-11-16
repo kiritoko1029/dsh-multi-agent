@@ -339,6 +339,24 @@ window.__ModuleLoader__.load({
 @media(max-width:540px){.ma-header-btn{padding:0 8px;gap:5px;font-size:11px;max-width:148px}}
 `
 
+    // Blank sessions hide the conversation header chrome, so the header seat is
+    // unreachable on the New Session hero. This chip joins the New Session row
+    // and reuses the same modal store, so configuration is available before the
+    // first turn as well as after it.
+    const HERO_CSS = `
+.ma-hero-utility{display:inline-flex;align-items:center;flex:0 0 auto;min-width:0}
+.ma-hero-utility *{box-sizing:border-box}
+.ma-hero-btn{display:inline-flex;align-items:center;gap:6px;min-width:0;height:28px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;font-weight:500;line-height:20px;white-space:nowrap;cursor:pointer;transition:background-color 150ms ease,color 150ms ease}
+.ma-hero-btn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ma-hero-btn[aria-expanded="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ma-hero-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.ma-hero-utility .ma-header-icon{width:14px;height:14px;flex:0 0 auto}
+.ma-hero-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:600px){.ma-hero-btn{max-width:148px}}
+@media(max-width:520px){.ma-hero-label{display:none}.ma-hero-btn{padding:0 6px}}
+@media(prefers-reduced-motion:reduce){.ma-hero-utility *{transition:none!important}}
+`
+
     const MODAL_CSS = `
 .ma-overlay-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:auto;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 72%,transparent);backdrop-filter:blur(4px);color:var(--dsw-alias-label-primary)}
 .ma-overlay-backdrop *{box-sizing:border-box}
@@ -408,7 +426,7 @@ window.__ModuleLoader__.load({
 .ma-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
 @media(max-width:920px){.ma-model-grid,.ma-two-col{grid-template-columns:1fr}.ma-modal-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ma-modal-nav{flex-direction:row;align-items:center;overflow-x:auto;padding:10px 14px;border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}.ma-nav-list{display:flex;flex:1 0 auto;gap:6px}.ma-nav-btn{width:auto;white-space:nowrap;padding:7px 11px}.ma-provider-list{display:none}}
 @media(max-width:680px){.ma-overlay-backdrop{padding:8px}.ma-modal{width:calc(100vw - 16px);height:calc(100vh - 16px);max-height:calc(100vh - 16px);border-radius:12px}.ma-modal-header{padding:14px 16px 12px}.ma-modal-scroll{padding:14px 16px 18px}.ma-modal-footer{padding:10px 16px}.ma-route{grid-template-columns:1fr}.ma-route .ma-remove{justify-self:start}}
-@media(prefers-reduced-motion:reduce){.ma-overlay-backdrop *,.ma-header-utility *{transition:none!important}}
+@media(prefers-reduced-motion:reduce){.ma-overlay-backdrop *,.ma-header-utility *,.ma-hero-utility *{transition:none!important}}
 `
 
     function validationError(code, field) {
@@ -729,17 +747,25 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function HeaderDispatchButton({ store, t }) {
+    // The header and New Session seats share one trigger; only their geometry
+    // and CSS differ, so both always open the same store-aware modal.
+    const DISPATCH_TRIGGERS = {
+      header: { name: 'multi-agent-dispatch-trigger', css: HEADER_CSS, rootClass: 'ma-header-utility', buttonClass: 'ma-header-btn', labelClass: 'ma-header-label' },
+      hero: { name: 'multi-agent-dispatch-hero-trigger', css: HERO_CSS, rootClass: 'ma-hero-utility', buttonClass: 'ma-hero-btn', labelClass: 'ma-hero-label' },
+    }
+
+    function DispatchButton({ store, t, variant = 'header' }) {
       const open = useDispatchModalOpen(store)
       const buttonRef = useRef(null)
       const label = t('unified.title')
-      return h('span', { className: 'ma-header-utility' },
-        h('style', null, HEADER_CSS),
+      const face = DISPATCH_TRIGGERS[variant] || DISPATCH_TRIGGERS.header
+      return h('span', { className: face.rootClass },
+        h('style', null, face.css),
         h('button', {
           ref: buttonRef,
           type: 'button',
-          name: 'multi-agent-dispatch-trigger',
-          className: 'ma-header-btn',
+          name: face.name,
+          className: face.buttonClass,
           title: t('header.tooltip'),
           'aria-label': label,
           'aria-haspopup': 'dialog',
@@ -747,7 +773,7 @@ window.__ModuleLoader__.load({
           onClick: () => store.open(buttonRef.current),
         },
         h(HeaderIcon),
-        h('span', { className: 'ma-header-label' }, label)))
+        h('span', { className: face.labelClass }, label)))
     }
 
     const MODAL_TITLE_ID = 'ma-dispatch-modal-title'
@@ -1293,7 +1319,18 @@ window.__ModuleLoader__.load({
           order: 30,
           locale: NS,
           label: () => t('unified.title'),
-        }, (props) => h(HeaderDispatchButton, { ...props, store, t: props?.t || t }))), 'multi-agent: header utility button')
+        }, (props) => h(DispatchButton, { ...props, store, t: props?.t || t }))), 'multi-agent: header utility button')
+        // A blank new session renders the Hero instead of the header chrome, so
+        // the same trigger also occupies the New Session options row. Both seats
+        // never render at once: the Hero owns the blank phase, the header owns
+        // the active one.
+        ctx.effect(() => ctx.slots.inject('conversation.hero.options', () => ctx.slots.register({
+          name: 'conversation.hero.options',
+          id: 'multi-agent-dispatch',
+          order: 30,
+          locale: NS,
+          label: () => t('unified.title'),
+        }, (props) => h(DispatchButton, { ...props, store, t: props?.t || t, variant: 'hero' }))), 'multi-agent: new session dispatch button')
         ctx.effect(() => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
           name: 'shell.overlay',
           id: 'multi-agent-dispatch',
