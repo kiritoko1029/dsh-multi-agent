@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadOfficialSource, verifyRuntimeContracts } from '../scripts/verify-runtime-contracts.mjs';
+import { loadOfficialSource } from '../scripts/verify-runtime-contracts.mjs';
 
 const execFileAsync = promisify(execFile);
 const script = fileURLToPath(new URL('../scripts/verify-runtime-contracts.mjs', import.meta.url));
@@ -41,19 +41,4 @@ test('源码指纹在求值前验证，拒绝错误版本或改过的实现', as
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
-});
-
-const rc1Source = process.env.DSH_RC1_SOURCE;
-const rc2Source = process.env.DSH_RC2_SOURCE;
-const requested = rc1Source !== undefined || rc2Source !== undefined;
-test('显式本地源码运行双版本真实隔离契约', {
-  skip: requested ? false : '需要 DSH_RC1_SOURCE 与 DSH_RC2_SOURCE；默认测试不下载上游源码',
-  timeout: 30_000,
-}, async () => {
-  assert.ok(rc1Source && rc2Source, '两个源码环境变量必须同时提供');
-  const compatibility = await import('../lib/runtime-compat.js');
-  const result = await verifyRuntimeContracts({ rc1Source, rc2Source, compatibility });
-  assert.equal(result.mode, '兼容层 + 双版本上游隔离契约');
-  assert.ok(result.checks.length >= 18);
-  assert.deepEqual(result.commits.map(item => item.version), ['rc1', 'rc2']);
 });

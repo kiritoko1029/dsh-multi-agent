@@ -4,7 +4,7 @@
 
 ## 安装（DSH 用户）
 
-1. 确认 DSH 版本为 `0.2.2-rc.1`、`0.2.2-rc.2` 或 `0.2.2-rc.3`，不要通过版本豁免强行安装。
+1. 确认 DSH 版本为 `0.2.2-rc.3`，不要通过版本豁免强行安装。
 2. 从 [GitHub Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载稳定版的 TGZ 安装包，可同时下载同名 `.sha256` 文件核对传输完整性。TGZ 不需要解压。
 3. 把 TGZ 文件或它在 DSH 所在电脑上的绝对路径发给 DSH，并发送：
 
@@ -26,17 +26,13 @@
 
 ## DSH 版本兼容
 
-同一份插件面向 **DSH `0.2.2-rc.1` / `0.2.2-rc.2` / `0.2.2-rc.3`**，无需手工切换模式。兼容层根据注入的 Host 服务能力选择接口，而非根据插件目录中依赖包的版本推测 Host；不识别或混合的接口组合会拒绝启动，不在派发失败后换参数格式重试，避免重复创建任务。
+**0.10.0 起仅支持 DSH `0.2.2-rc.3`**，`engines.dsh` 已同步收窄。RC1/RC2 不再属于兼容性或交付验收范围，不要通过版本豁免强行安装到这些版本。
 
-- rc.1 保留 `agents.roots()` 与嵌套 `request` 的 activation 契约；rc.2 使用精确存活 Agent／子代理树根判定和顶层 activation 参数。新派发与外部续接共用此适配边界。
-- rc.1 的持续协作例外仍使用 `spawn_teammate`；rc.2 不再提示或声明该工具，持续协作成员通过 `dispatch_agent(agent: "dsh")` 创建，再使用原生消息与已启用的 Team 任务板。两版均保留 `subagent_fork` 上下文继承例外。
-- rc.2 显式指定 `provider/model` 而未给 `reasoning_effort` 时使用模型默认强度；显式给 effort 必须同时提供完整 route。rc.1 保留既有选型行为。配置默认值与单次显式覆盖分别处理，模型授权检查不放宽。
-- 超时控制当前执行，不承诺跨版本递归终止全部后代。尤其 rc.2 的 `dispose()` 仅释放当前 activation；不会通过关闭主会话整棵树误杀其他并行任务。
-- rc.1 保留按 `turn/end` 结算的行为；rc.2 按配对的 `subagent/start/end` residency 结算。当前轮完成不提前开放续接，旧运行的迟到结果不能覆盖新续接。已接收的原生任务到期后若未确认停止，显示超时错误并禁止续接/清理，待同一运行的权威终态确认；不把“已请求取消”当成“已停止”。启动未接收的续接失败仍恢复前一终态。
-- 完成卡片兼容旧通知和 rc.2 的 `stopReason`。未找到本地任务时保留原通知、停止原因和报告入口，不显示误导性的任务详情按钮。
-- 三个官方 Subagent 依赖仍固定为 rc.1 的 Provider/helper 基线；它们不替换注入的 Host 服务。此轮不盲目升级依赖或扩大到未验证的 DSH 版本，版本准入由 `engines.dsh` 明确限定。
+- 插件仍根据注入的 Host 服务能力检查接口；不识别或混合的接口组合会拒绝启动，不在派发失败后换参数格式重试，避免重复创建任务。
+- 仓库中保留的历史适配代码与 RC 契约脚本仅供旧版本维护和诊断，不构成对 RC1/RC2 的兼容承诺；默认测试不再运行真实上游双版本矩阵。
+- 三个官方 Subagent 依赖仍固定为 rc.1 的 Provider/helper 基线；这是实现依赖，不代表支持 rc.1 Host，也不替换注入的 Host 服务。
 
-**升级安全：** 插件双版本兼容不等于 DSH 会话日志可降级。rc.2 创建具名子代理后会写入旧版无法读取的目录记录；升级前备份会话存储，不要让 rc.1 与 rc.2 同时访问同一份存储，也不要在新日志上直接降级。已有路由配置、报告路径和任务身份无需手工重置。
+**升级安全：** 新版 DSH 创建具名子代理后可能写入旧版无法读取的会话记录。升级前备份会话存储，不要让不同版本进程同时读写同一份存储，也不要直接在新版记录上降级。已有路由配置、报告路径和任务身份无需手工重置。
 
 ## 设计
 
@@ -74,7 +70,7 @@ DSH Subagent Manager
 独立的“派发路由约束”组件在 root 会话中执行以下规则：
 
 - 普通新任务统一使用 `dispatch_agent`，包括分配给 DSH 自身的任务。直接调用 `subagent` / `subagent_codex` 会在创建子任务之前被拒绝，并提示正确入口。
-- rc.1 中，只有确需持续成员协作或继承已完成对话时，先调用 `declare_delegate_exception`，再在下一步调用 `spawn_teammate` 或 `subagent_fork`。rc.2 中，持续协作改走 `dispatch_agent(agent: "dsh")`；例外仅用于继承已完成上下文的 `subagent_fork`。
+- 持续协作成员通过 `dispatch_agent(agent: "dsh")` 创建，再使用原生消息与已启用的 Team 任务板；`declare_delegate_exception` 例外仅用于继承已完成上下文的 `subagent_fork`。
 - 例外必须填写闭合的 `purpose`、具体 `reason`，以及与原生调用完全一致的 `description`；一次声明只允许本轮的一次匹配尝试，失败也会消费。声明记录由会话日志重放，不能跨会话或 Fork 继承复用。
 - 已有成员/子代理的 `send_message`、等待、中断、查询和任务看板操作不受影响。不要为了并行普通任务而创建 Team。
 - 非 root 子代理不受此策略阻塞；当前工具集中没有本插件的 `dispatch_agent` 时放行原生派发。这是派发工作流约束，不是权限安全边界，不改变审批、沙箱和模型授权。
@@ -90,11 +86,11 @@ DSH Subagent Manager
 }
 ```
 
-声明成功后调用原生 `subagent_fork`，并使用相同的 `description`。仅在 rc.1 中，`spawn_teammate` 对应的 `purpose` 为 `ongoing_collaboration`；rc.2 不提供该例外。
+声明成功后调用原生 `subagent_fork`，并使用相同的 `description`。
 
 ## 前置条件
 
-1. 使用 DSH `0.2.2-rc.1`、`0.2.2-rc.2` 或 `0.2.2-rc.3`，在自己的 DSH 中配置可用模型。只有使用外部 Agent 时才需要对应 CLI；不必把全部 CLI 装齐。
+1. 使用 DSH `0.2.2-rc.3`，在自己的 DSH 中配置可用模型。只有使用外部 Agent 时才需要对应 CLI；不必把全部 CLI 装齐。
 2. 使用 Codex 时，在本机安装并登录 Codex CLI。本插件独立注册 `codex-router` Provider，不要求启用官方 Codex 工具 bundle。
 3. 使用 Kimi 时，在本机安装并登录新版 Kimi Code CLI。优先检测当前用户的 `~/.kimi-code/bin/kimi`，然后搜索 PATH；可用 `KIMI_COMMAND` 覆盖检测路径。
 4. 使用 Antigravity 时，在本机安装并登录 `agy`，通过 `agy --version` 和 `agy acp --help` 检查。优先检测当前用户的 `~/.local/bin/agy`，然后搜索 PATH；可用 `AGY_COMMAND` 覆盖检测路径。
@@ -329,24 +325,19 @@ node scripts/smoke-agy.mjs
 # 可指定 CLI 路径，也可用 AGY_SMOKE_MODEL / AGY_SMOKE_EFFORT 指定测试模型与强度。
 ```
 
-### 双版本契约验证
+### 历史 RC 契约工具
 
-默认 `node --test test/*.test.mjs test/client.test.js` 不联网；未设置上游源码目录时，会明确跳过真实上游矩阵，其余双版本 fixture 测试仍执行。完整矩阵需要 Node 24+（使用内置 TypeScript 去类型 API）及两份官方固定版本源码：
+RC1/RC2 不再属于当前兼容性或交付验收范围。默认 `node --test test/*.test.mjs test/client.test.js` 不运行、也不会跳过真实上游双版本矩阵。
+
+仓库暂时保留 `scripts/verify-runtime-contracts.mjs` 作为历史诊断工具；仅主动维护旧版本时才需要 Node 24+（使用内置 TypeScript 去类型 API）及两份官方固定版本源码：
 
 ```sh
 node scripts/verify-runtime-contracts.mjs \
   --rc1-source /path/to/rc1-source \
   --rc2-source /path/to/rc2-source
-
-# 同时将真实上游矩阵纳入完整回归，不跳过该项：
-DSH_RC1_SOURCE=/path/to/rc1-source \
-DSH_RC2_SOURCE=/path/to/rc2-source \
-node --test test/*.test.mjs test/client.test.js
 ```
 
-脚本会校验使用文件的固定 SHA-256，分别执行两版官方的 AgentRegistry、startActivation 和外部启动管理器方法，检查错误形状对照、参数保持、精确身份、取消、provider 变更和不重试。无参数时查看 `node scripts/verify-runtime-contracts.mjs --help`。脚本不自动下载、不安装依赖、不调用模型。
-
-验证边界：这是“真实上游方法 + 明确的资源/Session/provider 替身”的隔离契约验证，不是完整 Cordis Host 或 rc.2 桌面端到端验收。开发验证包含完整回归和两版源码矩阵；真实 CLI、原生页面注册与桌面渲染仍以对应运行环境中的实际操作为准。
+该脚本不自动下载、不安装依赖、不调用模型。无参数时查看 `node scripts/verify-runtime-contracts.mjs --help`。真实 CLI、原生页面注册与桌面渲染仍以对应运行环境中的实际操作为准。
 
 本地链接包更新后需要由 Plugin Manager 协调重新加载。以返回的 `application` 和 `nextStep` 为准：`applied` 后仍需验证实际任务；`restart-required` 表示新代码需重启 DSH 才会加载，不能将磁盘版本更新说成正在运行的新版本。若返回 `failed to import`，先排查 Host 导入错误。前端源码修改后需重建 Client bundle；浏览器页面刷新本身不会重启 Host。
 

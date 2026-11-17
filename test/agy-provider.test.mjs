@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { apply, Config, inject, name } from '../agy-provider.js'
+import { AcpProvider } from '../acp-provider.js'
 import { setSystemProxyReader } from '../lib/proxy.js'
 import { runWithTaskTrace } from '../task-monitor.js'
 
@@ -65,11 +66,13 @@ process.stdin.on('data', chunk => {
       result = { configOptions: options(model) }
     } else if (method === 'session/prompt') {
       events.push({ method, sessionId: params.sessionId })
-      process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
+      const chunks = process.env.ACP_RESPONSE_CHUNKS === undefined
+        ? [JSON.stringify(events)] : JSON.parse(process.env.ACP_RESPONSE_CHUNKS)
+      for (const text of chunks) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: {
         sessionId: params.sessionId,
-        update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: JSON.stringify(events) } },
+        update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
       } }) + '\\n')
-      result = { stopReason: 'end_turn', ...(process.env.ACP_USAGE === '1' ? { usage: {
+      result = { stopReason: process.env.ACP_STOP_REASON ?? 'end_turn', ...(process.env.ACP_USAGE === '1' ? { usage: {
         totalTokens: 42, inputTokens: 30, outputTokens: 12, cachedReadTokens: 5, cachedWriteTokens: 2, thoughtTokens: 3,
       } } : {}) }
     } else {
@@ -154,27 +157,83 @@ function harness({ model: initialModel, reasoningEffort: initialEffort, availabl
     logger: { warn(message) { state.warnings.push(message) } },
   }
   apply(ctx, config)
+  async function runResult(trace) {
+    const run = await runWithTaskTrace(trace, () => state.provider.start({
+      cwd: process.cwd(), prompt: [{ type: 'text', text: 'Return ACP requests.' }],
+      signal: new AbortController().signal,
+      ...(parent === undefined ? {} : { parent }),
+    }))
+    try {
+      return await run.result
+    } finally {
+      await run.dispose()
+    }
+  }
   return {
     state,
+    runResult,
     setCommand(value) { config.command = value },
     setModel(value) { model = value },
     setReasoningEffort(value) { reasoningEffort = value },
     async run(trace) {
-      const run = await runWithTaskTrace(trace, () => state.provider.start({
-        cwd: process.cwd(), prompt: [{ type: 'text', text: 'Return ACP requests.' }],
-        signal: new AbortController().signal,
-        ...(parent === undefined ? {} : { parent }),
-      }))
-      try {
-        const result = await run.result
-        assert.equal(result.stopReason, 'completed')
-        return { ...state, requests: JSON.parse(result.output[0].text) }
-      } finally {
-        await run.dispose()
-      }
+      const result = await runResult(trace)
+      assert.equal(result.stopReason, 'completed')
+      return { ...state, requests: JSON.parse(result.output[0].text) }
     },
   }
 }
+
+const AGY_EXECUTION_WARNING = 'Agent execution terminated due to error.'
+
+for (const [description, chunks] of [
+  ['plain warning', [AGY_EXECUTION_WARNING]],
+  ['warning icon and whitespace', [`\n⚠ ${AGY_EXECUTION_WARNING}\n`]],
+  ['streamed warning with emoji variation selector', [' \n⚠️ Agent execution ', 'terminated due to error. \n']],
+]) {
+  test(`agy classifies ${description} plus end_turn as error and preserves its body`, async () => {
+    const result = await harness({ env: { ACP_RESPONSE_CHUNKS: JSON.stringify(chunks) } }).runResult()
+    assert.equal(result.stopReason, 'error')
+    assert.deepEqual(result.output, [{ type: 'text', text: chunks.join('') }])
+    assert.match(result.diagnostic, /Antigravity \(agy\) native execution failed/)
+    assert.match(result.diagnostic, /warning-only output; ACP stop reason: end_turn/)
+    assert.match(result.diagnostic, /native agy logs/)
+  })
+}
+
+for (const body of [
+  'AGY_OK',
+  `The CLI reported: ${AGY_EXECUTION_WARNING}`,
+  `"${AGY_EXECUTION_WARNING}"`,
+  `⚠ ${AGY_EXECUTION_WARNING}\nRecovered successfully.`,
+]) {
+  test(`agy keeps ordinary end_turn output completed: ${JSON.stringify(body)}`, async () => {
+    const result = await harness({ env: { ACP_RESPONSE_CHUNKS: JSON.stringify([body]) } }).runResult()
+    assert.equal(result.stopReason, 'completed')
+    assert.equal(result.diagnostic, undefined)
+    assert.deepEqual(result.output, [{ type: 'text', text: body }])
+  })
+}
+
+test('agy warning fallback preserves a native cancellation stop reason', async () => {
+  const result = await harness({ env: {
+    ACP_RESPONSE_CHUNKS: JSON.stringify([AGY_EXECUTION_WARNING]), ACP_STOP_REASON: 'cancelled',
+  } }).runResult()
+  assert.equal(result.stopReason, 'aborted')
+  assert.equal(result.diagnostic, undefined)
+  assert.deepEqual(result.output, [{ type: 'text', text: AGY_EXECUTION_WARNING }])
+})
+
+test('Kimi dialect keeps the same warning completed even with an agy provider name', async () => {
+  const body = `\n⚠ ${AGY_EXECUTION_WARNING}\n`
+  const agent = harness({ env: { ACP_RESPONSE_CHUNKS: JSON.stringify([body]) } })
+  const original = agent.state.provider
+  agent.state.provider = new AcpProvider('agy', original.ctx, original.config)
+  assert.equal(agent.state.provider.dialect.agent, 'kimi-code')
+  const result = await agent.runResult()
+  assert.equal(result.stopReason, 'completed')
+  assert.equal(result.diagnostic, undefined)
+  assert.deepEqual(result.output, [{ type: 'text', text: body }])
+})
 
 test('agy provider exports independent volatile ACP configuration', () => {
   assert.equal(name, 'agy-provider')

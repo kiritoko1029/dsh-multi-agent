@@ -607,12 +607,20 @@ async function startAcpRun(request, spec) {
           }), cancelSettled.then(() => {
             throw new Error('subagent cancelled while the ACP prompt was running')
           })])
-          const stopReason = acpStopReason(promptResult.stopReason)
+          const output = collectOutput()
+          // agy can report native execution failure as ordinary text + end_turn.
+          // Limit the fallback to its entire fixed warning, preserving other replies.
+          const agyExecutionFailed = spec.agent === 'agy' && promptResult.stopReason === 'end_turn'
+            && output.length === 1 && output[0].type === 'text'
+            && /^\s*(?:⚠\uFE0F?\s*)?Agent execution terminated due to error\.\s*$/u.test(output[0].text)
+          const stopReason = agyExecutionFailed ? 'error' : acpStopReason(promptResult.stopReason)
           const usage = acpUsage(promptResult.usage)
           if (usage) tasks?.setTelemetry?.({ usage, usageScope: 'session' })
-          diagnostic = terminalFailure(promptResult.stopReason, latestPermission)
+          diagnostic = agyExecutionFailed
+            ? 'Antigravity (agy) native execution failed: Agent execution terminated due to error. (Detected from warning-only output; ACP stop reason: end_turn.) See native agy logs for the underlying error.'
+            : terminalFailure(promptResult.stopReason, latestPermission)
           return {
-            output: collectOutput(),
+            output,
             ...diagnostic === undefined ? {} : { diagnostic },
             stopReason,
           }
@@ -720,6 +728,7 @@ export class AcpProvider {
       ? [this.dialect.bypassFlag]
       : []
     return startAcpRun(request, {
+      agent: this.dialect.agent,
       command: this.config.command,
       args: [...(this.config.args ?? []), ...bypassArgs],
       cwd,

@@ -2,8 +2,11 @@ window.__ModuleLoader__.load({
   id: '@kiritoko1029/dsh-multi-agent',
   factory(require) {
     const React = require('react')
+    const uiTheme = require('dsh-multi-agent/ui-theme')
     const h = React.createElement
     const { useState, useEffect, useRef } = React
+    const { THEME_IDS, THEME_CSS, writeTheme, createUseTheme } = uiTheme
+    const useTheme = createUseTheme(React)
     const NS = '@kiritoko1029/dsh-multi-agent'
     const AGENT_OPTIONS = [
       { value: 'codex', label: 'Codex' },
@@ -151,6 +154,13 @@ window.__ModuleLoader__.load({
         'modal.close': 'Close',
         'modal.closeAria': 'Close multi-agent dispatch settings',
         'modal.navAria': 'Settings sections',
+        'theme.label': 'Appearance',
+        'theme.hint': 'Synced with task console',
+        'theme.system': 'System (follow host)',
+        'theme.studio': 'Studio (cool light)',
+        'theme.paper': 'Paper (warm light)',
+        'theme.midnight': 'Midnight (deep dark)',
+        'theme.graphite': 'Graphite (neutral dark)',
         'modal.nav.all': 'All settings',
         'modal.nav.models': 'Models & reasoning',
         'modal.nav.policy': 'Dispatch policy & rules',
@@ -307,6 +317,13 @@ window.__ModuleLoader__.load({
         'modal.close': '关闭',
         'modal.closeAria': '关闭多 Agent 派发设置',
         'modal.navAria': '设置分组',
+        'theme.label': '外观',
+        'theme.hint': '与任务面板实时同步',
+        'theme.system': '系统（跟随宿主）',
+        'theme.studio': 'Studio（冷调浅色）',
+        'theme.paper': 'Paper（暖纸浅色）',
+        'theme.midnight': 'Midnight（深海暗色）',
+        'theme.graphite': 'Graphite（石墨中性暗色）',
         'modal.nav.all': '全部设置',
         'modal.nav.models': '模型与思考强度',
         'modal.nav.policy': '派发策略与规则',
@@ -330,13 +347,16 @@ window.__ModuleLoader__.load({
     const HEADER_CSS = `
 .ma-header-utility{display:inline-flex;align-items:center;flex:0 0 auto;min-width:0}
 .ma-header-utility *{box-sizing:border-box}
-.ma-header-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;min-width:0;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
-.ma-header-btn:hover{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+.ma-header-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;min-width:0;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease}
+.ma-header-btn:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+.ma-header-btn:active:not(:disabled){transform:translateY(1px)}
 .ma-header-btn[aria-expanded="true"]{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}
 .ma-header-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.ma-header-btn:disabled{opacity:.52;cursor:not-allowed}
 .ma-header-icon{width:14px;height:14px;flex:0 0 auto}
 .ma-header-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:540px){.ma-header-btn{padding:0 8px;gap:5px;font-size:11px;max-width:148px}}
+@media(prefers-reduced-motion:reduce){.ma-header-utility *{transition:none!important;transform:none!important}}
 `
 
     // Blank sessions hide the conversation header chrome, so the header seat is
@@ -346,87 +366,129 @@ window.__ModuleLoader__.load({
     const HERO_CSS = `
 .ma-hero-utility{display:inline-flex;align-items:center;flex:0 0 auto;min-width:0}
 .ma-hero-utility *{box-sizing:border-box}
-.ma-hero-btn{display:inline-flex;align-items:center;gap:6px;min-width:0;height:28px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;font-weight:500;line-height:20px;white-space:nowrap;cursor:pointer;transition:background-color 150ms ease,color 150ms ease}
-.ma-hero-btn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ma-hero-btn{display:inline-flex;align-items:center;gap:6px;min-width:0;height:28px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;font-weight:500;line-height:20px;white-space:nowrap;cursor:pointer;transition:background-color 180ms ease,color 180ms ease,transform 180ms ease}
+.ma-hero-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.ma-hero-btn:active:not(:disabled){transform:translateY(1px)}
 .ma-hero-btn[aria-expanded="true"]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
 .ma-hero-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.ma-hero-btn:disabled{opacity:.52;cursor:not-allowed}
 .ma-hero-utility .ma-header-icon{width:14px;height:14px;flex:0 0 auto}
 .ma-hero-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:600px){.ma-hero-btn{max-width:148px}}
 @media(max-width:520px){.ma-hero-label{display:none}.ma-hero-btn{padding:0 6px}}
-@media(prefers-reduced-motion:reduce){.ma-hero-utility *{transition:none!important}}
+@media(prefers-reduced-motion:reduce){.ma-hero-utility *{transition:none!important;transform:none!important}}
 `
 
     const MODAL_CSS = `
-.ma-overlay-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:auto;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 72%,transparent);backdrop-filter:blur(4px);color:var(--dsw-alias-label-primary)}
+.ma-overlay-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:auto;background:color-mix(in srgb,var(--ma-bg) 74%,transparent);backdrop-filter:blur(6px);color:var(--ma-text)}
 .ma-overlay-backdrop *{box-sizing:border-box}
-.ma-modal{display:flex;flex-direction:column;width:min(1180px,calc(100vw - 48px));height:min(85vh,920px);max-height:calc(100vh - 32px);min-width:0;min-height:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:16px;background:var(--dsw-alias-bg-overlay,var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-label-primary);pointer-events:auto;outline:none}
+.ma-modal{display:flex;flex-direction:column;width:min(1180px,calc(100vw - 48px));height:min(85vh,920px);max-height:calc(100vh - 32px);min-width:0;min-height:0;overflow:hidden;border:1px solid var(--ma-line-strong);border-radius:16px;background:var(--ma-overlay);color:var(--ma-text);box-shadow:var(--ma-shadow);pointer-events:auto;outline:none}
 .ma-modal-form{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;height:100%}
-.ma-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex:0 0 auto;padding:18px 22px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
+.ma-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex:0 0 auto;padding:18px 24px 15px;border-bottom:1px solid var(--ma-line);background:var(--ma-surface)}
 .ma-modal-heading{display:grid;gap:4px;min-width:0}
-.ma-modal-title-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.ma-modal-header h2{margin:0;font-size:18px;font-weight:650;line-height:1.35;color:var(--dsw-alias-label-primary)}
-.ma-modal-header p{margin:0;font-size:13px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
-.ma-modal-close{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:32px;height:32px;padding:0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease}
-.ma-modal-close:hover{border-color:var(--dsw-alias-brand-primary)}
+.ma-modal-title-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ma-modal-header h2{margin:0;font-size:18px;font-weight:650;line-height:1.3;letter-spacing:-.015em;color:var(--ma-text)}
+.ma-modal-header p{margin:0;font-size:13px;line-height:1.5;color:var(--ma-muted)}
+.ma-modal-tools{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.ma-theme-picker{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 6px 0 10px;border:1px solid var(--ma-control-border);border-radius:9px;background:var(--ma-bg);color:var(--ma-muted);font-size:12px;font-weight:500;white-space:nowrap;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
+.ma-theme-picker:hover{border-color:var(--ma-accent);background:var(--ma-surface)}
+.ma-theme-picker:focus-within{border-color:var(--ma-accent);box-shadow:0 0 0 3px var(--ma-focus-ring)}
+.ma-theme-picker-icon{width:14px;height:14px;flex:0 0 auto;color:var(--ma-accent)}
+.ma-theme-picker-label{color:var(--ma-muted)}
+.ma-theme-picker select{height:28px;min-width:0;padding:0 6px;border:0;border-radius:6px;background:transparent;color:var(--ma-text);font:inherit;font-size:12px;font-weight:550;cursor:pointer;outline:none}
+.ma-theme-picker select option{background:var(--ma-surface);color:var(--ma-text)}
+.ma-modal-close{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:32px;height:32px;padding:0;border:1px solid var(--ma-line-strong);border-radius:9px;background:var(--ma-bg);color:var(--ma-text);cursor:pointer;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease}
+.ma-modal-close:hover:not(:disabled){border-color:var(--ma-accent);background:var(--ma-hover)}
 .ma-modal-close svg{width:16px;height:16px}
-.ma-unsaved-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;flex:0 0 auto;padding:10px 22px;border-bottom:1px solid var(--dsw-alias-state-warn-primary);background:var(--dsw-alias-bg-layer-2);font-size:13px;line-height:1.45}
-.ma-unsaved-copy{color:var(--dsw-alias-label-primary);font-weight:500}
+.ma-unsaved-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;flex:0 0 auto;padding:11px 24px;border-bottom:1px solid var(--ma-warn);background:var(--ma-warn-soft);font-size:13px;line-height:1.45}
+.ma-unsaved-copy{color:var(--ma-text);font-weight:550}
 .ma-unsaved-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.ma-modal-body{display:grid;grid-template-columns:224px minmax(0,1fr);flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
-.ma-modal-status-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:24px;display:grid;place-items:center;text-align:center;color:var(--dsw-alias-label-secondary);font-size:14px}
-.ma-modal-nav{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;padding:16px 14px;border-right:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);overflow-y:auto}
-.ma-nav-list{display:grid;gap:6px}
-.ma-nav-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 11px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;font-weight:500;text-align:left;cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
-.ma-nav-btn:hover{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l2)}
-.ma-nav-btn[aria-pressed="true"]{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
-.ma-dirty-dot{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--dsw-alias-state-warn-primary)}
-.ma-provider-list{display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}
-.ma-provider-list-title{margin:0;font-size:11px;font-weight:600;color:var(--dsw-alias-label-secondary);letter-spacing:.02em;text-transform:uppercase}
-.ma-provider-item{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--dsw-alias-label-secondary)}
-.ma-provider-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-primary)}
-.ma-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;font-size:11px;font-weight:500;line-height:1.4;color:var(--dsw-alias-label-secondary);white-space:nowrap}
-.ma-badge[data-tone="ready"]{color:var(--dsw-alias-state-success-primary);border-color:var(--dsw-alias-border-l2)}
-.ma-badge[data-tone="warn"]{color:var(--dsw-alias-state-warn-primary);border-color:var(--dsw-alias-state-warn-primary)}
-.ma-badge[data-tone="idle"]{color:var(--dsw-alias-state-idle-primary)}
-.ma-modal-scroll{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 24px 24px;display:grid;align-content:start;gap:20px}
+.ma-modal-body{display:grid;grid-template-columns:244px minmax(0,1fr);flex:1 1 auto;min-width:0;min-height:0;overflow:hidden;background:var(--ma-bg)}
+.ma-modal-status-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:32px 24px;display:grid;place-items:center;background:var(--ma-bg)}
+.ma-status-card{display:grid;justify-items:center;gap:12px;max-width:420px;padding:28px 24px;border:1px solid var(--ma-line);border-radius:14px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm);text-align:center;color:var(--ma-muted);font-size:13.5px;line-height:1.55}
+.ma-status-icon{width:28px;height:28px;color:var(--ma-accent)}
+.ma-modal-nav{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;padding:16px 14px;border-right:1px solid var(--ma-line);background:var(--ma-surface);overflow-y:auto}
+.ma-nav-list{display:grid;gap:5px}
+.ma-nav-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 11px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--ma-text);font:inherit;font-size:13px;font-weight:500;text-align:left;cursor:pointer;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease}
+.ma-nav-btn-main{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.ma-nav-icon{width:15px;height:15px;flex:0 0 auto;color:var(--ma-muted);transition:color 180ms ease}
+.ma-nav-btn:hover:not(:disabled){background:var(--ma-hover);border-color:var(--ma-line)}
+.ma-nav-btn[aria-pressed="true"]{border-color:color-mix(in srgb,var(--ma-accent) 28%,transparent);background:var(--ma-accent-soft);color:var(--ma-accent);font-weight:600}
+.ma-nav-btn[aria-pressed="true"] .ma-nav-icon{color:var(--ma-accent)}
+.ma-dirty-dot{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--ma-warn)}
+.ma-appearance-panel{display:grid;gap:8px;padding:11px;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-bg)}
+.ma-appearance-head{display:grid;gap:2px}
+.ma-appearance-title{margin:0;font-size:11px;font-weight:650;color:var(--ma-text);letter-spacing:.03em;text-transform:uppercase}
+.ma-appearance-hint{margin:0;font-size:11px;line-height:1.35;color:var(--ma-muted)}
+.ma-theme-grid{display:grid;gap:4px}
+.ma-modal button.ma-theme-choice{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:30px;padding:5px 9px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ma-text);font-size:12px;font-weight:500;text-align:left}
+.ma-modal button.ma-theme-choice:hover:not(:disabled){background:var(--ma-hover);border-color:var(--ma-line)}
+.ma-modal button.ma-theme-choice[aria-checked="true"]{background:var(--ma-accent-soft);border-color:color-mix(in srgb,var(--ma-accent) 32%,transparent);color:var(--ma-accent);font-weight:600}
+.ma-theme-choice-main{display:inline-flex;align-items:center;gap:7px;min-width:0;overflow:hidden}
+.ma-theme-choice-main span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ma-theme-choice-icon{width:13px;height:13px;flex:0 0 auto;color:var(--ma-muted)}
+.ma-modal button.ma-theme-choice[aria-checked="true"] .ma-theme-choice-icon{color:var(--ma-accent)}
+.ma-theme-check{width:13px;height:13px;flex:0 0 auto;color:var(--ma-accent)}
+.ma-provider-list{display:grid;gap:8px;margin-top:auto;padding:11px;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-bg)}
+.ma-provider-list-title{margin:0;font-size:11px;font-weight:650;color:var(--ma-muted);letter-spacing:.03em;text-transform:uppercase}
+.ma-provider-item{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ma-muted)}
+.ma-provider-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ma-text);font-weight:500}
+.ma-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--ma-line-strong);border-radius:999px;background:var(--ma-surface);font-size:11px;font-weight:550;line-height:1.4;color:var(--ma-muted);white-space:nowrap}
+.ma-badge::before{content:'';width:6px;height:6px;flex:0 0 auto;border-radius:50%;background:currentColor}
+.ma-badge[data-tone="ready"]{color:var(--ma-success);background:var(--ma-success-soft);border-color:color-mix(in srgb,var(--ma-success) 26%,transparent)}
+.ma-badge[data-tone="warn"]{color:var(--ma-warn);background:var(--ma-warn-soft);border-color:color-mix(in srgb,var(--ma-warn) 30%,transparent)}
+.ma-badge[data-tone="idle"]{color:var(--ma-idle);background:var(--ma-idle-soft);border-color:color-mix(in srgb,var(--ma-idle) 24%,transparent)}
+.ma-modal-scroll{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:22px 26px 28px;display:grid;align-content:start;gap:20px}
 .ma-settings{display:grid;gap:20px;min-width:0;color:inherit}
 .ma-settings>.ma-outer-fieldset{min-width:0;margin:0;padding:0;border:0;display:grid;gap:20px}
-.ma-section{display:grid;gap:16px;padding:18px 20px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1)}
-.ma-section-head{display:grid;gap:4px}
-.ma-section h2,.ma-section h3{margin:0;color:var(--dsw-alias-label-primary)}
-.ma-section h2{font-size:16px;font-weight:650;line-height:1.4}
-.ma-section h3{font-size:14px;font-weight:600;line-height:1.4}
-.ma-section p{margin:0;font-size:12.5px;line-height:1.55;color:var(--dsw-alias-label-secondary)}
+.ma-section{display:grid;gap:16px;padding:20px 22px;border:1px solid var(--ma-line);border-radius:14px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.ma-section-head{display:grid;gap:4px;padding-bottom:10px;border-bottom:1px solid var(--ma-line)}
+.ma-section-subhead{display:grid;gap:4px;padding-top:4px}
+.ma-section h2,.ma-section h3{margin:0;color:var(--ma-text)}
+.ma-section h2{font-size:15.5px;font-weight:650;line-height:1.35;letter-spacing:-.01em}
+.ma-section h3{font-size:13.5px;font-weight:620;line-height:1.4}
+.ma-section p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ma-muted)}
 .ma-model-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .ma-runtime-grid{display:grid;grid-template-columns:1fr;gap:14px}
-.ma-card{display:grid;align-content:start;gap:12px;min-width:0;margin:0;padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
-.ma-card-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.ma-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.ma-card{display:grid;align-content:start;gap:12px;min-width:0;margin:0;padding:16px;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-surface-raised);transition:border-color 180ms ease}
+.ma-card:focus-within{border-color:color-mix(in srgb,var(--ma-accent) 42%,var(--ma-line-strong))}
+.ma-card>h3{padding-bottom:6px;border-bottom:1px solid var(--ma-line)}
+.ma-card-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px}
+.ma-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:14px}
 .ma-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.ma-field{display:grid;gap:6px;min-width:0;font-size:13px;line-height:1.4}
-.ma-field>span{font-weight:500;color:var(--dsw-alias-label-primary)}
-.ma-field input,.ma-field select,.ma-field textarea{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}
-.ma-field textarea{min-height:84px;resize:vertical;line-height:1.5}
-.ma-field textarea.ma-code{font-family:monospace;min-height:74px}
-.ma-field input:focus-visible,.ma-field select:focus-visible,.ma-field textarea:focus-visible,.ma-modal button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.ma-field{display:grid;gap:6px;min-width:0;font-size:12.5px;line-height:1.4}
+.ma-field>span{font-weight:560;color:var(--ma-text)}
+.ma-field input,.ma-field select,.ma-field textarea{width:100%;min-width:0;min-height:36px;padding:7px 11px;border:1px solid var(--ma-control-border);border-radius:9px;background:var(--ma-surface-sunken);color:var(--ma-text);font:inherit;font-size:13px;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
+.ma-field input:hover:not(:disabled),.ma-field select:hover:not(:disabled),.ma-field textarea:hover:not(:disabled){border-color:var(--ma-accent)}
+.ma-field input:focus,.ma-field select:focus,.ma-field textarea:focus{background:var(--ma-surface);border-color:var(--ma-accent);box-shadow:0 0 0 3px var(--ma-focus-ring)}
+.ma-field textarea{min-height:84px;padding:9px 11px;resize:vertical;line-height:1.55}
+.ma-field textarea.ma-code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;min-height:78px}
+.ma-field input:focus-visible,.ma-field select:focus-visible,.ma-field textarea:focus-visible,.ma-modal button:focus-visible,.ma-theme-picker select:focus-visible{outline:2px solid var(--ma-accent);outline-offset:2px}
+.ma-note{padding-left:10px;border-left:2px solid var(--ma-line-strong);font-size:12px;line-height:1.5;color:var(--ma-muted)}
 .ma-routes{display:grid;gap:10px}
-.ma-route{display:grid;grid-template-columns:minmax(150px,.28fr) minmax(240px,1fr) auto;gap:12px;align-items:end;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
-.ma-modal button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 13px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
-.ma-modal button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}
-.ma-modal .ma-btn-primary{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary);font-weight:600}
-.ma-modal :disabled{opacity:.55;cursor:not-allowed}
-.ma-error{color:var(--dsw-alias-state-error-primary)!important;opacity:1!important}
-.ma-success{color:var(--dsw-alias-state-success-primary)!important;opacity:1!important}
-.ma-readonly-banner{margin:0;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:13px}
-.ma-catalog{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
-.ma-modal-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;flex:0 0 auto;padding:12px 22px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
-.ma-footer-status{flex:1 1 240px;min-width:0;font-size:13px;line-height:1.45;color:var(--dsw-alias-label-secondary)}
-.ma-footer-status p{margin:0}
+.ma-route{display:grid;grid-template-columns:minmax(150px,.28fr) minmax(240px,1fr) auto;gap:12px;align-items:end;padding:14px;border:1px solid var(--ma-line);border-radius:11px;background:var(--ma-surface-raised)}
+.ma-modal button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:7px 14px;border:1px solid var(--ma-line-strong);border-radius:9px;background:var(--ma-surface);color:var(--ma-text);font:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease,box-shadow 180ms ease}
+.ma-modal button:hover:not(:disabled){border-color:var(--ma-accent);background:var(--ma-hover)}
+.ma-modal button:active:not(:disabled){transform:translateY(1px)}
+.ma-modal .ma-remove:hover:not(:disabled){border-color:var(--ma-error);background:var(--ma-error-soft);color:var(--ma-error)}
+.ma-modal .ma-btn-primary{border-color:var(--ma-accent-fill);background:var(--ma-accent-fill);color:var(--ma-on-accent);font-weight:600;box-shadow:var(--ma-shadow-sm)}
+.ma-modal .ma-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ma-accent-fill) 90%,var(--ma-text));border-color:var(--ma-accent-fill);color:var(--ma-on-accent)}
+.ma-modal :disabled{opacity:.52;cursor:not-allowed}
+.ma-error{color:var(--ma-error)!important;opacity:1!important}
+.ma-success{color:var(--ma-success)!important;opacity:1!important}
+.ma-readonly-banner{margin:0;padding:11px 14px;border:1px solid var(--ma-line-strong);border-radius:10px;background:var(--ma-surface);color:var(--ma-muted);font-size:13px}
+.ma-catalog{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:7px 10px;border:1px solid var(--ma-line);border-radius:8px;background:var(--ma-surface);font-size:12px;line-height:1.45;color:var(--ma-muted)}
+.ma-catalog button{min-height:26px;padding:3px 9px;font-size:11.5px}
+.ma-modal-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;flex:0 0 auto;padding:13px 24px;border-top:1px solid var(--ma-line);background:var(--ma-surface)}
+.ma-footer-status{flex:1 1 240px;min-width:0;font-size:13px;line-height:1.45;color:var(--ma-muted)}
+.ma-footer-status p{display:inline-flex;align-items:center;gap:6px;margin:0;padding:4px 10px;border-radius:8px;background:var(--ma-bg);font-weight:500}
+.ma-footer-status p.ma-error{background:var(--ma-error-soft)}
+.ma-footer-status p.ma-success{background:var(--ma-success-soft)}
 .ma-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
-@media(max-width:920px){.ma-model-grid,.ma-two-col{grid-template-columns:1fr}.ma-modal-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ma-modal-nav{flex-direction:row;align-items:center;overflow-x:auto;padding:10px 14px;border-right:0;border-bottom:1px solid var(--dsw-alias-border-l1)}.ma-nav-list{display:flex;flex:1 0 auto;gap:6px}.ma-nav-btn{width:auto;white-space:nowrap;padding:7px 11px}.ma-provider-list{display:none}}
-@media(max-width:680px){.ma-overlay-backdrop{padding:8px}.ma-modal{width:calc(100vw - 16px);height:calc(100vh - 16px);max-height:calc(100vh - 16px);border-radius:12px}.ma-modal-header{padding:14px 16px 12px}.ma-modal-scroll{padding:14px 16px 18px}.ma-modal-footer{padding:10px 16px}.ma-route{grid-template-columns:1fr}.ma-route .ma-remove{justify-self:start}}
-@media(prefers-reduced-motion:reduce){.ma-overlay-backdrop *,.ma-header-utility *,.ma-hero-utility *{transition:none!important}}
+@media(max-width:920px){.ma-model-grid,.ma-two-col{grid-template-columns:1fr}.ma-modal-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ma-modal-nav{flex-direction:row;align-items:center;overflow-x:auto;padding:10px 16px;border-right:0;border-bottom:1px solid var(--ma-line)}.ma-nav-list{display:flex;flex:1 0 auto;gap:6px}.ma-nav-btn{width:auto;white-space:nowrap;padding:7px 11px}.ma-appearance-panel,.ma-provider-list{display:none}}
+@media(max-width:680px){.ma-overlay-backdrop{padding:8px}.ma-modal{width:calc(100vw - 16px);height:calc(100vh - 16px);max-height:calc(100vh - 16px);border-radius:12px}.ma-modal-header{flex-wrap:wrap;padding:14px 16px 12px}.ma-modal-tools{width:100%;justify-content:space-between}.ma-theme-picker{flex:1 1 auto;min-width:0}.ma-theme-picker select{flex:1 1 auto;width:100%}.ma-modal-scroll{padding:14px 16px 18px}.ma-section{padding:15px 16px}.ma-modal-footer{padding:10px 16px}.ma-route{grid-template-columns:1fr}.ma-route .ma-remove{justify-self:start}}
+@media(max-width:480px){.ma-theme-picker-label{display:none}.ma-card-fields,.ma-fields{grid-template-columns:minmax(0,1fr)}.ma-actions{width:100%}.ma-actions button{flex:1 1 auto}}
+@media(prefers-reduced-motion:reduce){.ma-overlay-backdrop *,.ma-modal *{transition:none!important;animation:none!important;transform:none!important}}
 `
 
     function validationError(code, field) {
@@ -513,22 +575,47 @@ window.__ModuleLoader__.load({
       })
     }
 
-    function HeaderIcon() {
-      const paths = ['M4 6h16', 'M4 12h16', 'M4 18h16', 'M9 4v4', 'M15 10v4', 'M11 16v4']
+    function SvgIcon({ className, paths, strokeWidth = 1.75 }) {
       return h('svg', {
-        className: 'ma-header-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-        strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+        className, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        strokeWidth, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
       }, paths.map((d) => h('path', { key: d, d })))
     }
 
+    function HeaderIcon() {
+      return h(SvgIcon, {
+        className: 'ma-header-icon',
+        strokeWidth: 1.7,
+        paths: ['M4 6h16', 'M4 12h16', 'M4 18h16', 'M9 4v4', 'M15 10v4', 'M11 16v4'],
+      })
+    }
+
     function CloseIcon() {
-      return h('svg', {
-        viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-        strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
-      }, [
-        h('path', { key: 'a', d: 'M6 6l12 12' }),
-        h('path', { key: 'b', d: 'M18 6L6 18' }),
-      ])
+      return h(SvgIcon, { strokeWidth: 1.8, paths: ['M6 6l12 12', 'M18 6L6 18'] })
+    }
+
+    function NavIcon({ id }) {
+      const paths = id === 'models'
+        ? ['M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z', 'M12 12l8-4.5', 'M12 12v9', 'M12 12L4 7.5']
+        : id === 'policy'
+          ? ['M6 3v12', 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M18 9a9 9 0 0 1-9 9']
+          : id === 'runtime'
+            ? ['M4 7h10', 'M18 7h2', 'M14 5v4', 'M4 17h4', 'M12 17h8', 'M8 15v4']
+            : ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M4 13h7v7H4z', 'M13 13h7v7h-7z']
+      return h(SvgIcon, { className: 'ma-nav-icon', paths })
+    }
+
+    function ThemeIcon({ id, className = 'ma-theme-choice-icon' }) {
+      const paths = id === 'studio'
+        ? ['M12 4v2', 'M12 18v2', 'M4.93 4.93l1.41 1.41', 'M17.66 17.66l1.41 1.41', 'M4 12h2', 'M18 12h2', 'M6.34 17.66l-1.41 1.41', 'M19.07 4.93l-1.41 1.41', 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z']
+        : id === 'paper'
+          ? ['M6 3h9l4 4v14H6z', 'M15 3v4h4', 'M9 12h6', 'M9 16h4']
+          : id === 'midnight'
+            ? ['M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z']
+            : id === 'graphite'
+              ? ['M12 3l9 5-9 5-9-5 9-5z', 'M3 12l9 5 9-5', 'M3 16l9 5 9-5']
+              : ['M4 5h16v11H4z', 'M8 20h8', 'M12 16v4']
+      return h(SvgIcon, { className, paths })
     }
 
     function Field({ name, label, value, onChange, type = 'text', ...props }) {
@@ -703,9 +790,10 @@ window.__ModuleLoader__.load({
       return open
     }
 
-    const FOCUSABLE_SELECTOR = 'a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]:not([tabindex="-1"])'
+    const FOCUSABLE_SELECTOR = 'a[href]:not([tabindex="-1"]),button:not(:disabled):not([tabindex="-1"]),input:not(:disabled):not([tabindex="-1"]),select:not(:disabled):not([tabindex="-1"]),textarea:not(:disabled):not([tabindex="-1"]),summary:not([tabindex="-1"]),[tabindex]:not([tabindex="-1"])'
     function isElementVisible(element) {
       if (!element || element.disabled) return false
+      if (typeof element.tabIndex === 'number' && element.tabIndex < 0) return false
       if (typeof element.closest === 'function' && element.closest('[hidden]')) return false
       if (typeof getComputedStyle === 'function') {
         const style = getComputedStyle(element)
@@ -779,7 +867,7 @@ window.__ModuleLoader__.load({
     const MODAL_TITLE_ID = 'ma-dispatch-modal-title'
     const MODAL_DESC_ID = 'ma-dispatch-modal-desc'
 
-    function ConfigForm({ form, t, loadCatalogs, onClose, dialogRef, closeButtonRef, attemptCloseRef }) {
+    function ConfigForm({ form, t, loadCatalogs, onClose, dialogRef, closeButtonRef, attemptCloseRef, theme }) {
       const kind = 'unified'
       const [snapshot, setSnapshot] = useState(() => form.getSnapshot())
       const [edits, setEdits] = useState({})
@@ -791,6 +879,7 @@ window.__ModuleLoader__.load({
       const saving = useRef(false)
       const mounted = useRef(false)
       const continueButtonRef = useRef(null)
+      const themeRadioRefs = useRef(new Map())
       const wasConfirmClose = useRef(false)
       const catalogGeneration = useRef({ dsh: 0, codex: 0, acp: 0, agy: 0 })
       const [catalogs, setCatalogs] = useState(() => Object.fromEntries(['dsh', 'codex', 'acp', 'agy'].map((key) => [key, { status: 'loading', groups: [], failures: [] }])))
@@ -852,21 +941,38 @@ window.__ModuleLoader__.load({
             h('h2', { id: MODAL_TITLE_ID }, t('unified.title')),
             extraBadge),
           h('p', { id: MODAL_DESC_ID }, t('unified.description'))),
-        h('button', {
-          ref: closeButtonRef,
-          type: 'button',
-          name: 'modal-close',
-          className: 'ma-modal-close',
-          'aria-label': t('modal.closeAria'),
-          title: t('modal.close'),
-          onClick: () => attemptClose(),
-        }, h(CloseIcon)))
+        h('div', { className: 'ma-modal-tools' },
+          h('label', { className: 'ma-theme-picker' },
+            h(ThemeIcon, { id: theme, className: 'ma-theme-picker-icon' }),
+            h('span', { className: 'ma-theme-picker-label' }, t('theme.label')),
+            h('select', {
+              name: 'modal-theme',
+              'aria-label': t('theme.label'),
+              value: theme,
+              onChange: (event) => writeTheme(event.target.value),
+            }, THEME_IDS.map((id) => h('option', { key: id, value: id }, t(`theme.${id}`))))),
+          h('button', {
+            ref: closeButtonRef,
+            type: 'button',
+            name: 'modal-close',
+            className: 'ma-modal-close',
+            'aria-label': t('modal.closeAria'),
+            title: t('modal.close'),
+            onClick: () => attemptClose(),
+          }, h(CloseIcon))))
 
       if (snapshot.status !== 'ready') {
         return h('div', { className: 'ma-modal-form' },
           modalHeader(null),
           h('div', { className: 'ma-modal-status-body', role: 'status' },
-            t(snapshot.status === 'loading' ? 'common.loading' : 'common.unavailable')),
+            h('div', { className: 'ma-status-card' },
+              h(SvgIcon, {
+                className: 'ma-status-icon',
+                paths: snapshot.status === 'loading'
+                  ? ['M12 3a9 9 0 1 0 9 9']
+                  : ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 8v5', 'M12 16h.01'],
+              }),
+              h('span', null, t(snapshot.status === 'loading' ? 'common.loading' : 'common.unavailable')))),
           h('footer', { className: 'ma-modal-footer' },
             h('div', { className: 'ma-actions' },
               h('button', { type: 'button', name: 'modal-footer-close', onClick: () => attemptClose() }, t('modal.close')))))
@@ -976,7 +1082,7 @@ window.__ModuleLoader__.load({
         const available = snapshot.sections[owner]
         return h('fieldset', { key: owner, className: 'ma-card', disabled: !available },
           h('h3', null, title),
-          !available ? h('p', { role: 'status' }, t('unified.disabled')) : null,
+          !available ? h('p', { role: 'status', className: 'ma-note' }, t('unified.disabled')) : null,
           h('div', { className: 'ma-card-fields' },
             h(ModelField, { name: `${owner}.model`, label: t(`${owner}.model`), value: get(`${owner}.model`, ''), onChange: (next) => changeModel(`${owner}.model`, next), options, t }),
             h(ModelField, { name: `${owner}.reasoningEffort`, label: t('unified.effort'), placeholder: t('unified.effort'), value: get(`${owner}.reasoningEffort`, ''), onChange: (next) => change(`${owner}.reasoningEffort`, next), options: efforts, t }),
@@ -1020,19 +1126,19 @@ window.__ModuleLoader__.load({
         const available = snapshot.sections[owner]
         return h('fieldset', { key: owner, className: 'ma-card', disabled: !available },
           h('h3', null, title),
-          !available ? h('p', { role: 'status' }, t('unified.disabled')) : null,
+          !available ? h('p', { role: 'status', className: 'ma-note' }, t('unified.disabled')) : null,
           h('div', { className: 'ma-fields' },
             ...permissionPolicyFields(owner),
             ...proxyFields(owner),
             h(Field, { name: `${owner}.disposeEofGraceMs`, label: t(`${owner}.disposeEofGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeEofGraceMs`, 6000), onChange: (next) => change(`${owner}.disposeEofGraceMs`, next) }),
             h(Field, { name: `${owner}.disposeGraceMs`, label: t(`${owner}.disposeGraceMs`), type: 'number', min: 1, max: 2147483647, step: 1, value: get(`${owner}.disposeGraceMs`, 3000), onChange: (next) => change(`${owner}.disposeGraceMs`, next) })),
-          h('p', null, t(`${owner}.permissionWarning`)),
-          h('p', null, t('common.proxyHint')),
+          h('p', { className: 'ma-note' }, t(`${owner}.permissionWarning`)),
+          h('p', { className: 'ma-note' }, t('common.proxyHint')),
           h('div', { className: 'ma-two-col' },
             h(TextArea, { name: `${owner}.args`, className: 'ma-code', label: t(`${owner}.args`), value: getJson(`${owner}.args`, ['acp']), onChange: (next) => change(`${owner}.args`, next) }),
             h('div', { className: 'ma-field' },
               h(TextArea, { name: `${owner}.env`, className: 'ma-code', label: t(`${owner}.env`), value: getJson(`${owner}.env`, {}), onChange: (next) => change(`${owner}.env`, next) }),
-              h('p', null, t(`${owner}.envHint`)))))
+              h('p', { className: 'ma-note' }, t(`${owner}.envHint`)))))
       }
 
       const dirtySections = new Set(editKeys.map(sectionForField))
@@ -1056,6 +1162,20 @@ window.__ModuleLoader__.load({
       const showModels = activeSection === 'all' || activeSection === 'models'
       const showPolicy = activeSection === 'all' || activeSection === 'policy'
       const showRuntime = activeSection === 'all' || activeSection === 'runtime'
+      const activeThemeId = THEME_IDS.includes(theme) ? theme : THEME_IDS[0]
+      const onThemeRadioKeyDown = (event, index) => {
+        if (event.defaultPrevented || event.isComposing) return
+        let nextIndex
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % THEME_IDS.length
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + THEME_IDS.length) % THEME_IDS.length
+        else if (event.key === 'Home') nextIndex = 0
+        else if (event.key === 'End') nextIndex = THEME_IDS.length - 1
+        else return
+        event.preventDefault?.()
+        const nextId = THEME_IDS[nextIndex]
+        writeTheme(nextId)
+        themeRadioRefs.current.get(nextId)?.focus?.({ preventScroll: true })
+      }
       const isAlertResult = result === 'common.failure' || result === 'common.conflict' || result.startsWith('common.invalid') || result === 'common.commandRequired' || result === 'agy.commandRequired' || result === 'common.routesRequired' || conflict
 
       return h('form', { className: 'ma-modal-form', onSubmit: save, 'aria-label': t('unified.title') },
@@ -1093,8 +1213,31 @@ window.__ModuleLoader__.load({
                 'aria-pressed': activeSection === section.id,
                 onClick: () => setActiveSection(section.id),
               },
-              h('span', null, section.label),
+              h('span', { className: 'ma-nav-btn-main' },
+                h(NavIcon, { id: section.id }),
+                h('span', null, section.label)),
               section.dirty ? h('span', { className: 'ma-dirty-dot', 'aria-hidden': true }) : null))),
+            h('div', { className: 'ma-appearance-panel' },
+              h('div', { className: 'ma-appearance-head' },
+                h('p', { className: 'ma-appearance-title' }, t('theme.label')),
+                h('p', { className: 'ma-appearance-hint' }, t('theme.hint'))),
+              h('div', { className: 'ma-theme-grid', role: 'radiogroup', 'aria-label': t('theme.label') },
+                THEME_IDS.map((id, index) => h('button', {
+                  key: id,
+                  ref: (node) => { if (node) themeRadioRefs.current.set(id, node); else themeRadioRefs.current.delete(id) },
+                  type: 'button',
+                  name: `theme-choice-${id}`,
+                  role: 'radio',
+                  'aria-checked': theme === id,
+                  tabIndex: id === activeThemeId ? 0 : -1,
+                  className: 'ma-theme-choice',
+                  onClick: () => writeTheme(id),
+                  onKeyDown: (event) => onThemeRadioKeyDown(event, index),
+                },
+                h('span', { className: 'ma-theme-choice-main' },
+                  h(ThemeIcon, { id }),
+                  h('span', null, t(`theme.${id}`))),
+                theme === id ? h(SvgIcon, { className: 'ma-theme-check', strokeWidth: 2, paths: ['M5 12.5l4.2 4.2L19 7'] }) : null)))),
             h('div', { className: 'ma-provider-list' },
               h('p', { className: 'ma-provider-list-title' }, t('modal.statusHeading')),
               providerStatuses.map((item) => {
@@ -1123,7 +1266,7 @@ window.__ModuleLoader__.load({
                         h(ModelField, { name: 'dsh.defaultModel', label: t('router.dsh.defaultModel'), value: get('dsh.defaultModel', ''), onChange: (next) => changeModel('dsh.defaultModel', next), options: dshModels, t }),
                         h(ModelField, { name: 'dsh.defaultReasoningEffort', label: t('unified.effort'), placeholder: t('unified.effort'), value: get('dsh.defaultReasoningEffort', ''), onChange: (next) => change('dsh.defaultReasoningEffort', next), options: dshEfforts, t })),
                       h(CatalogStatus, { catalog, onRetry: () => reloadCatalog('dsh'), t }),
-                      h('p', null, t('router.modelHint'))),
+                      h('p', { className: 'ma-note' }, t('router.modelHint'))),
                     externalModelCard('codex', 'Codex'),
                     externalModelCard('acp', 'Kimi Code'),
                     externalModelCard('agy', t('agy.title')))) : null,
@@ -1135,7 +1278,7 @@ window.__ModuleLoader__.load({
                     h(Select, { name: 'selectionMode', label: t('router.selectionMode'), value: get('selectionMode', 'auto'), onChange: (next) => change('selectionMode', next), options: ['auto', 'ask-if-ambiguous', 'always-ask'].map((mode) => ({ value: mode, label: t(`router.selectionMode.${mode}`) })) }),
                     h(Select, { name: 'defaultAgent', label: t('router.defaultAgent'), value: get('defaultAgent', ''), onChange: (next) => change('defaultAgent', next), options: [{ value: '', label: t('router.noDefault') }, ...AGENT_OPTIONS] }),
                     h(Field, { name: 'timeoutSeconds', label: t('router.timeoutSeconds'), type: 'number', min: 1, max: 86400, step: 1, required: true, value: get('timeoutSeconds', 1800), onChange: (next) => change('timeoutSeconds', next) })),
-                  h('div', { className: 'ma-section-head' },
+                  h('div', { className: 'ma-section-subhead' },
                     h('h3', null, t('router.routes')),
                     h('p', null, t('router.routesHint'))),
                   h(RoutesEditor, { routes: get('routes', []), onChange: (next) => change('routes', next), t }),
@@ -1149,14 +1292,14 @@ window.__ModuleLoader__.load({
                   h('div', { className: 'ma-runtime-grid' },
                     h('fieldset', { className: 'ma-card', disabled: !snapshot.sections.codex },
                       h('h3', null, 'Codex'),
-                      !snapshot.sections.codex ? h('p', { role: 'status' }, t('unified.disabled')) : null,
+                      !snapshot.sections.codex ? h('p', { role: 'status', className: 'ma-note' }, t('unified.disabled')) : null,
                       h('div', { className: 'ma-fields' },
                         ...permissionPolicyFields('codex', 'permissionPolicy'),
                         h(Select, { name: 'codex.permissionMode', label: t('codex.permissionMode'), value: get('codex.permissionMode', 'approve-for-me'), onChange: (next) => change('codex.permissionMode', next), options: ['never', 'approve-for-me', 'dangerously-bypass-approvals-and-sandbox'].map((mode) => ({ value: mode, label: t(`codex.permissionMode.${mode}`) })) }),
                         ...proxyFields('codex'),
                         h(Field, { name: 'codex.disposeGraceMs', label: t('codex.disposeGraceMs'), type: 'number', min: 1, max: 2147483647, step: 1, value: get('codex.disposeGraceMs', 3000), onChange: (next) => change('codex.disposeGraceMs', next) })),
-                      h('p', null, t('codex.permissionWarning')),
-                      h('p', null, t('common.proxyHint')),
+                      h('p', { className: 'ma-note' }, t('codex.permissionWarning')),
+                      h('p', { className: 'ma-note' }, t('common.proxyHint')),
                       h(TextArea, { name: 'codex.env', className: 'ma-code', label: t('codex.env'), value: getJson('codex.env', {}), onChange: (next) => change('codex.env', next) })),
                     acpRuntimeCard('acp', 'Kimi Code'),
                     acpRuntimeCard('agy', t('agy.title')))) : null)))),
@@ -1173,6 +1316,7 @@ window.__ModuleLoader__.load({
     }
 
     function DispatchOverlay({ store, form, loadCatalogs, t }) {
+      const overlayTheme = useTheme()
       const open = useDispatchModalOpen(store)
       const wasOpen = useRef(false)
       const triggerRef = useRef(null)
@@ -1235,6 +1379,7 @@ window.__ModuleLoader__.load({
 
       return h('div', {
         className: 'ma-overlay-backdrop',
+        'data-ma-theme': overlayTheme,
         onMouseDown: (event) => { backdropMouseDown.current = event.target === event.currentTarget },
         onClick: (event) => {
           const allowClose = backdropMouseDown.current !== false
@@ -1244,7 +1389,7 @@ window.__ModuleLoader__.load({
           }
         },
       },
-      h('style', null, MODAL_CSS),
+      h('style', null, `${THEME_CSS}\n${MODAL_CSS}`),
       h('div', {
         ref: dialogRef,
         className: 'ma-modal',
@@ -1268,6 +1413,7 @@ window.__ModuleLoader__.load({
         form,
         loadCatalogs,
         t,
+        theme: overlayTheme,
         onClose: () => store.close(),
         dialogRef,
         closeButtonRef,

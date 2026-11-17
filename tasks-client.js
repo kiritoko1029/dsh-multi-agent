@@ -3,8 +3,11 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const MarkdownIt = require('markdown-it')
+    const uiTheme = require('dsh-multi-agent/ui-theme')
     const h = React.createElement
     const { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } = React
+    const { THEME_CSS, createUseTheme } = uiTheme
+    const useTheme = createUseTheme(React)
     const markdownParser = new MarkdownIt({ html: false, linkify: false })
     const defaultLinkValidation = markdownParser.validateLink
     markdownParser.validateLink = (url) => /^file:\/\/\//i.test(url) || defaultLinkValidation(url)
@@ -180,124 +183,146 @@ window.__ModuleLoader__.load({
         'completion.openTasks': '打开任务面板',
       },
     }
+
     const CSS = `
-.matasks{box-sizing:border-box;display:grid;gap:14px;min-width:0;padding:14px;color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5}
+.matasks{box-sizing:border-box;display:grid;gap:14px;min-width:0;padding:14px;color:var(--ma-text);font-size:13px;line-height:1.55}
 .matasks *{box-sizing:border-box}
-.matasks-panel{display:flex;flex-direction:column;flex:1 1 auto;align-items:stretch;justify-content:flex-start;gap:6px;width:100%;height:100%;min-height:0;padding:8px;overflow:hidden;background:var(--dsw-alias-bg-layer-1)}
+.matasks-panel{display:flex;flex-direction:column;flex:1 1 auto;align-items:stretch;justify-content:flex-start;gap:10px;width:100%;height:100%;min-height:0;padding:10px;overflow:hidden;background:var(--ma-bg)}
 .matasks-panel>*{flex:0 0 auto}
-.matasks-panel>.matasks-workspace{flex:1 1 auto;min-height:0}
+.matasks-panel>.matasks-workspace,.matasks-panel>.matasks-task-history{flex:1 1 auto;min-height:0}
 .matasks h2,.matasks h3,.matasks p{margin:0}
-.matasks h2{font-size:16px;line-height:1.35;letter-spacing:.01em}.matasks h3{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
-.matasks-overview{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px}
-.matasks-heading{display:flex;align-items:baseline;gap:8px;min-width:0;overflow:hidden;white-space:nowrap}
-.matasks-heading h2{flex:0 0 auto;font-size:14px}
-.matasks-overview-count{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--dsw-alias-label-secondary);font-size:11px}
+.matasks h2{font-size:15px;font-weight:650;line-height:1.35;letter-spacing:-.01em;color:var(--ma-text)}
+.matasks h3{font-size:11.5px;font-weight:650;letter-spacing:.025em;text-transform:uppercase;color:var(--ma-muted)}
+.matasks-overview{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:4px 6px 4px 12px;border:1px solid var(--ma-line);border-radius:11px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.matasks-heading{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;white-space:nowrap}
+.matasks-heading h2{flex:0 0 auto;font-size:13.5px}
+.matasks-overview-count{display:inline-flex;align-items:center;min-width:0;padding:1px 8px;border:1px solid var(--ma-line);border-radius:999px;background:var(--ma-surface-sunken);overflow:hidden;text-overflow:ellipsis;color:var(--ma-muted);font-size:11px;font-weight:550;font-variant-numeric:tabular-nums}
 .matasks-overview .matasks-view-actions{flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:4px}
-.matasks-overview button{min-width:28px;min-height:28px;padding:3px 5px;font-size:11px;border-color:transparent;background:transparent}
-.matasks-overview button:hover{background:var(--dsw-alias-bg-layer-2)}
-.matasks-muted{color:var(--dsw-alias-label-secondary)}
-.matasks code{overflow-wrap:anywhere;font-family:monospace;font-size:12px}
-.matasks button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:5px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;touch-action:manipulation;transition:border-color 160ms ease,background-color 160ms ease,color 160ms ease}
-.matasks button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary)}
-.matasks button:focus-visible,.matasks summary:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.matasks button:disabled{cursor:default}
+.matasks-overview button{min-width:28px;min-height:28px;padding:4px 7px;font-size:11px;border-color:transparent;border-radius:7px;background:transparent}
+.matasks-overview button:hover:not(:disabled){background:var(--ma-hover);border-color:var(--ma-line)}
+.matasks-muted{color:var(--ma-muted)}
+.matasks code{overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
+.matasks button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:5px 11px;border:1px solid var(--ma-line-strong);border-radius:8px;background:var(--ma-surface);color:var(--ma-text);font:inherit;font-size:12.5px;font-weight:530;cursor:pointer;touch-action:manipulation;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease,box-shadow 180ms ease}
+.matasks button:hover:not(:disabled){background:var(--ma-hover);border-color:var(--ma-accent)}
+.matasks button:active:not(:disabled){transform:translateY(1px)}
+.matasks button:disabled{opacity:.52;cursor:not-allowed}
+.matasks :is(button,summary,select,input,textarea,a):focus-visible,.matasks-activity-viewport:focus-visible,.matasks-empty:focus-visible,.matasks-empty:focus{outline:2px solid var(--ma-accent);outline-offset:2px}
+.matasks :is(input,select,textarea){border:1px solid var(--ma-control-border);border-radius:8px;background:var(--ma-surface-sunken);color:var(--ma-text);font:inherit;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
+.matasks :is(input,select,textarea):hover:not(:disabled){border-color:var(--ma-accent)}
+.matasks :is(input,select,textarea):focus{background:var(--ma-surface);border-color:var(--ma-accent);box-shadow:0 0 0 3px var(--ma-focus-ring)}
 .matasks-icon{width:15px;height:15px;flex:0 0 auto}
-.matasks-error{padding:9px 11px;border:1px solid var(--dsw-alias-state-error-primary);border-radius:8px;color:var(--dsw-alias-state-error-primary)}
-.matasks-session-meta{color:var(--dsw-alias-label-secondary);font-size:12px}
-.matasks-session-meta summary{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;cursor:pointer;list-style:none}
+.matasks-error{margin:0;padding:10px 12px;border:1px solid color-mix(in srgb,var(--ma-error) 36%,var(--ma-line));border-radius:9px;background:var(--ma-error-soft);color:var(--ma-error);font-weight:500}
+.matasks-receipt{padding:9px 12px;border:1px solid color-mix(in srgb,var(--ma-accent) 28%,var(--ma-line));border-radius:9px;background:var(--ma-accent-soft);color:var(--ma-text)}
+.matasks-session-meta{color:var(--ma-muted);font-size:12px}
+.matasks-session-meta summary{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid transparent;border-radius:7px;cursor:pointer;list-style:none;transition:background-color 180ms ease,border-color 180ms ease}
 .matasks-session-meta summary::-webkit-details-marker{display:none}
-.matasks-session-meta summary:hover,.matasks-session-meta[open] summary{background:var(--dsw-alias-bg-layer-2)}
-.matasks-session-meta dl{position:absolute;z-index:5;top:calc(100% + 4px);right:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;width:min(360px,100%);max-height:180px;overflow:auto;margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-overlay)}
-.matasks-session-meta dt{font-weight:600}.matasks-session-meta dd{min-width:0;margin:0;overflow-wrap:anywhere}
-.matasks-tabs{display:flex;flex-wrap:wrap;gap:6px;max-width:100%;max-height:25%;padding:2px;overflow:auto;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.matasks-tab{justify-content:flex-start!important;min-width:0;max-width:240px;min-height:40px!important;padding:6px 9px!important;text-align:left;border-color:var(--dsw-alias-border-l1)!important;background:var(--dsw-alias-bg-layer-1)!important}
-.matasks-tab[aria-selected=true]{border-color:var(--dsw-alias-brand-primary)!important;background:var(--dsw-alias-brand-primary-soft)!important;color:var(--dsw-alias-brand-primary)}
-.matasks-tab-copy{display:grid;gap:1px;min-width:0;line-height:1.3}
-.matasks-tab-provider{color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600;overflow-wrap:anywhere}
-.matasks-tab-label{font-weight:600;overflow-wrap:anywhere}
-.matasks-tab .matasks-status{margin-left:4px}
+.matasks-session-meta summary:hover,.matasks-session-meta[open] summary{background:var(--ma-hover);border-color:var(--ma-line)}
+.matasks-session-meta dl{position:absolute;z-index:5;top:calc(100% + 6px);right:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;width:min(368px,100%,calc(100vw - 24px));max-width:100%;max-height:200px;overflow:auto;margin:0;padding:12px 14px;border:1px solid var(--ma-line-strong);border-radius:11px;background:var(--ma-overlay);box-shadow:var(--ma-shadow)}
+.matasks-session-meta dt{font-weight:600;color:var(--ma-muted)}
+.matasks-session-meta dd{min-width:0;margin:0;overflow-wrap:anywhere;color:var(--ma-text)}
+.matasks-session-meta dd code{display:inline-block;padding:1px 6px;border-radius:5px;background:var(--ma-surface-sunken);border:1px solid var(--ma-line)}
+.matasks-tabs{display:flex;flex-wrap:wrap;gap:6px;max-width:100%;max-height:26%;padding:4px;overflow:auto;border:1px solid var(--ma-line);border-radius:11px;background:var(--ma-surface-sunken)}
+.matasks-tab{justify-content:space-between!important;align-items:flex-start!important;gap:8px!important;min-width:0;max-width:252px;min-height:46px!important;padding:7px 10px!important;text-align:left;border-radius:8px!important;border-color:var(--ma-line)!important;background:var(--ma-surface)!important;box-shadow:var(--ma-shadow-sm)}
+.matasks-tab:hover:not(:disabled){border-color:var(--ma-line-strong)!important;background:var(--ma-surface-raised)!important}
+.matasks-tab[aria-selected=true]{border-color:var(--ma-accent)!important;background:var(--ma-accent-soft)!important;color:var(--ma-accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ma-accent) 20%,transparent)}
+.matasks-tab[aria-selected=true] .matasks-tab-provider,.matasks-tab[aria-selected=true] .matasks-tab-label{color:var(--ma-accent)}
+.matasks-tab-copy{display:grid;gap:2px;min-width:0;line-height:1.3}
+.matasks-tab-provider{color:var(--ma-muted);font-size:10.5px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;overflow-wrap:anywhere}
+.matasks-tab-label{font-weight:620;color:var(--ma-text);overflow-wrap:anywhere}
+.matasks-tab .matasks-status{margin-left:2px;flex:0 0 auto}
 .matasks-badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.matasks-badge{display:inline-flex;align-items:center;padding:1px 7px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;white-space:nowrap}
-.matasks-status{display:inline-flex;align-items:center;gap:5px;color:var(--dsw-alias-state-idle-primary);font-size:11px;white-space:nowrap}
+.matasks-badge{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--ma-line-strong);border-radius:999px;background:var(--ma-surface-raised);color:var(--ma-muted);font-size:11px;font-weight:540;line-height:1.35;white-space:nowrap}
+.matasks-status{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:999px;background:color-mix(in srgb,currentColor 10%,transparent);color:var(--ma-idle);font-size:11px;font-weight:560;line-height:1.35;white-space:nowrap}
 .matasks-status::before{width:6px;height:6px;flex:0 0 auto;border-radius:50%;background:currentColor;content:''}
-.matasks-status[data-tone=active]{color:var(--dsw-alias-state-success-primary)}
-.matasks-status[data-tone=neutral]{color:var(--dsw-alias-label-secondary)}
-.matasks-status[data-tone=error]{color:var(--dsw-alias-state-error-primary)}
-.matasks-status[data-tone=warn]{color:var(--dsw-alias-state-warn-primary)}
-.matasks-workspace{display:flex;flex-direction:column;align-items:stretch;width:100%;min-width:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}
-.matasks-task-head{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
+.matasks-status[data-tone=active]{color:var(--ma-success)}
+.matasks-status[data-tone=neutral]{color:var(--ma-muted)}
+.matasks-status[data-tone=error]{color:var(--ma-error)}
+.matasks-status[data-tone=warn]{color:var(--ma-warn)}
+.matasks-workspace{display:flex;flex-direction:column;align-items:stretch;width:100%;min-width:0;overflow:hidden;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.matasks-task-head{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 14px;padding:12px 14px;border-bottom:1px solid var(--ma-line);background:color-mix(in srgb,var(--ma-surface) 92%,var(--ma-bg));backdrop-filter:blur(8px)}
 .matasks-task-title{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
-.matasks-label{font-weight:650;overflow-wrap:anywhere}
-.matasks-duration{color:var(--dsw-alias-label-secondary);font-size:12px;font-variant-numeric:tabular-nums}
-.matasks-created{color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:400;font-variant-numeric:tabular-nums}
-.matasks-task-timing{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
-.matasks-telemetry{display:flex;flex-wrap:wrap;gap:2px 12px;min-width:0;margin-top:5px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:1.5}
-.matasks-telemetry>span{min-width:0;overflow-wrap:anywhere}
+.matasks-label{font-size:13.5px;font-weight:650;color:var(--ma-text);overflow-wrap:anywhere}
+.matasks-duration{color:var(--ma-muted);font-size:11.5px;font-weight:550;font-variant-numeric:tabular-nums}
+.matasks-created{color:var(--ma-muted);font-size:11px;font-weight:450;font-variant-numeric:tabular-nums}
+.matasks-task-timing{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:3px}
+.matasks-telemetry{display:flex;flex-wrap:wrap;gap:5px 6px;min-width:0;margin-top:7px;color:var(--ma-muted);font-size:11px;line-height:1.4}
+.matasks-telemetry>span{display:inline-flex;align-items:center;min-width:0;padding:2px 7px;border:1px solid var(--ma-line);border-radius:6px;background:var(--ma-surface-sunken);overflow-wrap:anywhere}
 .matasks-token-usage{font-variant-numeric:tabular-nums}
 .matasks-actions{display:flex;flex-wrap:wrap;gap:8px;padding-top:11px}
 .matasks-task-head .matasks-actions{padding-top:0}
 .matasks-activity-frame{position:relative;display:flex;flex:1 1 auto;min-width:0;min-height:0}
-.matasks-activity-viewport{flex:1 1 auto;width:100%;min-width:0;min-height:0;padding:10px 12px 14px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto}
+.matasks-activity-viewport{flex:1 1 auto;width:100%;min-width:0;min-height:0;padding:12px 14px 16px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto;background:var(--ma-bg)}
 .matasks-activity-content{display:grid;align-content:start;gap:12px;min-width:0}
-.matasks-activity-content>section{min-width:0}
+.matasks-activity-content>section{display:grid;gap:8px;min-width:0}
 .matasks-timeline{display:grid;gap:10px;min-width:0}
 .matasks-message,.matasks-final-output-text{min-width:0;overflow-wrap:anywhere}
+.matasks-message{padding:11px 13px;border:1px solid var(--ma-line);border-radius:10px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
 .matasks-markdown{line-height:1.65}
-.matasks-markdown h1,.matasks-markdown h2,.matasks-markdown h3,.matasks-markdown h4,.matasks-markdown h5,.matasks-markdown h6{margin:12px 0 6px;font-weight:650;line-height:1.4;color:var(--dsw-alias-label-primary)}
-.matasks-markdown h1{font-size:1.5em}.matasks-markdown h2{font-size:1.3em}.matasks-markdown h3{font-size:1.15em}.matasks-markdown h4,.matasks-markdown h5,.matasks-markdown h6{font-size:1em}
+.matasks-markdown h1,.matasks-markdown h2,.matasks-markdown h3,.matasks-markdown h4,.matasks-markdown h5,.matasks-markdown h6{margin:12px 0 6px;font-weight:650;line-height:1.4;letter-spacing:normal;text-transform:none;color:var(--ma-text)}
+.matasks-markdown h1{font-size:1.45em}.matasks-markdown h2{font-size:1.25em}.matasks-markdown h3{font-size:1.12em}.matasks-markdown h4,.matasks-markdown h5,.matasks-markdown h6{font-size:1em}
 .matasks-markdown>:first-child{margin-top:0}
 .matasks-markdown>p+p{margin-top:8px}
-.matasks-markdown strong{font-weight:700}.matasks-markdown em{font-style:italic}
-.matasks-markdown ul,.matasks-markdown ol{margin:6px 0;padding-left:24px;list-style-position:outside}
+.matasks-markdown strong{font-weight:680}.matasks-markdown em{font-style:italic}
+.matasks-markdown ul,.matasks-markdown ol{margin:6px 0;padding-left:22px;list-style-position:outside}
 .matasks-markdown ul{list-style-type:disc}.matasks-markdown ol{list-style-type:decimal}.matasks-markdown li{display:list-item;margin:2px 0}
-.matasks-markdown a{color:var(--dsw-alias-brand-primary);text-decoration:underline;text-underline-offset:2px}
-.matasks-markdown a:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.matasks-markdown hr{border:0;border-top:1px solid var(--dsw-alias-border-l2);margin:12px 0}
-.matasks-markdown blockquote{margin:8px 0;padding-left:10px;border-left:2px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}
-.matasks-inline-code{padding:1px 4px;border-radius:4px;background:var(--dsw-alias-bg-layer-2)}
-.matasks-markdown table{max-width:100%;margin:6px 0;border-collapse:collapse}
-.matasks-markdown th,.matasks-markdown td{padding:4px 8px;border:1px solid var(--dsw-alias-border-l2);text-align:left}
-.matasks-file-link{color:var(--dsw-alias-brand-primary);cursor:pointer}
-.matasks-final-output{display:grid;gap:5px}
-.matasks pre{max-width:100%;margin:5px 0 0;padding:10px;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit}
+.matasks-markdown a{color:var(--ma-accent);text-decoration:underline;text-underline-offset:2px}
+.matasks-markdown hr{border:0;border-top:1px solid var(--ma-line-strong);margin:12px 0}
+.matasks-markdown blockquote{margin:8px 0;padding:6px 11px;border-left:3px solid var(--ma-accent);border-radius:0 6px 6px 0;background:var(--ma-surface-sunken);color:var(--ma-muted)}
+.matasks-inline-code{padding:1px 5px;border:1px solid var(--ma-line);border-radius:5px;background:var(--ma-surface-sunken)}
+.matasks-markdown table{max-width:100%;margin:8px 0;border-collapse:collapse}
+.matasks-markdown th,.matasks-markdown td{padding:5px 9px;border:1px solid var(--ma-line-strong);text-align:left}
+.matasks-markdown th{background:var(--ma-surface-sunken);font-weight:620}
+.matasks-file-link{color:var(--ma-accent);cursor:pointer}
+.matasks-final-output{display:grid;gap:8px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--ma-accent) 30%,var(--ma-line));border-radius:11px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.matasks-final-output>h3{color:var(--ma-accent)}
+.matasks pre{max-width:100%;margin:6px 0 0;padding:10px 12px;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--ma-line);border-radius:8px;background:var(--ma-surface-sunken);color:var(--ma-text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.5}
 .matasks-output{max-height:none;overflow:visible}
-.matasks-tool-activity{min-width:0;color:var(--dsw-alias-label-secondary)}
-.matasks-tool-activity>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
-.matasks-tool-activity>summary::before,.matasks-tool-detail>summary::before{content:'›';display:inline-block;flex:0 0 auto;width:10px;text-align:center}
+.matasks-tool-activity{min-width:0;padding:8px 11px;border:1px solid var(--ma-line);border-radius:10px;background:var(--ma-surface-sunken);color:var(--ma-muted);transition:border-color 180ms ease,background-color 180ms ease}
+.matasks-tool-activity[open]{border-color:var(--ma-line-strong);background:var(--ma-surface)}
+.matasks-tool-activity>summary{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:560;color:var(--ma-text);cursor:pointer;list-style:none}
+.matasks-tool-activity>summary::-webkit-details-marker,.matasks-tool-detail>summary::-webkit-details-marker{display:none}
+.matasks-tool-activity>summary::before,.matasks-tool-detail>summary::before{content:'›';display:inline-block;flex:0 0 auto;width:10px;text-align:center;color:var(--ma-muted);transition:transform 180ms ease}
 .matasks-tool-activity[open]>summary::before,.matasks-tool-detail[open]>summary::before{transform:rotate(90deg)}
-.matasks-tool-activities{display:grid;gap:2px;list-style:none;margin:5px 0 0;padding:0 0 0 5px}
+.matasks-tool-activities{display:grid;gap:4px;list-style:none;margin:8px 0 0;padding:0 0 0 10px;border-left:2px solid var(--ma-line)}
 .matasks-tool-item{min-width:0}
-.matasks-tool-detail>summary{display:flex;align-items:center;gap:6px;min-width:0;padding:3px 0;cursor:pointer}
-.matasks-command-preview{display:block;min-width:0;flex:1;white-space:pre-wrap;overflow-wrap:anywhere}
-.matasks-tool-status{font-size:11px;white-space:nowrap}
+.matasks-tool-detail>summary{display:flex;align-items:center;gap:6px;min-width:0;padding:4px 6px;border-radius:6px;cursor:pointer;list-style:none;transition:background-color 180ms ease}
+.matasks-tool-detail>summary:hover{background:var(--ma-hover)}
+.matasks-command-preview{display:block;min-width:0;flex:1;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ma-text)}
+.matasks-tool-status{padding:1px 6px;border-radius:999px;background:var(--ma-surface-raised);border:1px solid var(--ma-line);font-size:10.5px;font-weight:550;white-space:nowrap}
 .matasks-activity-toggle{justify-self:start}
-.matasks-jump-latest{position:absolute;right:12px;bottom:12px;z-index:3;width:32px;min-height:32px!important;padding:6px!important;border-radius:50%!important;background:var(--dsw-alias-bg-layer-2)!important}
+.matasks-jump-latest{position:absolute;right:14px;bottom:14px;z-index:3;width:34px;min-height:34px!important;padding:7px!important;border-radius:50%!important;border-color:var(--ma-line-strong)!important;background:var(--ma-overlay)!important;box-shadow:var(--ma-shadow)}
 .matasks-history{margin-bottom:2px}
-.matasks-panel>.matasks-task-history{flex:1 1 auto;min-height:0}
-.matasks-task-history{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);border-radius:9px;background:var(--dsw-alias-bg-layer-2)}
-.matasks-history-heading{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:10px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.matasks-history-body{display:grid;flex:1 1 auto;min-height:0;align-content:start;gap:8px;padding:10px;overflow-y:auto}
+.matasks-task-history{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.matasks-history-heading{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--ma-line);background:var(--ma-surface-raised)}
+.matasks-history-body{display:grid;flex:1 1 auto;min-height:0;align-content:start;gap:10px;padding:12px 14px;overflow-y:auto}
 .matasks-view-actions{display:flex;flex-wrap:wrap;gap:6px}
-.matasks-history-list{display:grid;gap:6px;list-style:none;margin:0;padding:0}
-.matasks-history-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:7px 10px;min-width:0;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1)}
-.matasks-history-row[data-selected=true]{border-color:var(--dsw-alias-brand-primary)}
-.matasks-history-main{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;min-width:0}
-.matasks-history-actions{display:flex;flex-wrap:wrap;gap:5px}
-.matasks-history-actions button{min-height:28px;padding:3px 7px;font-size:12px}
-.matasks-continue{padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1)}
-.matasks-continue>summary{cursor:pointer;font-weight:600}
-.matasks-continue-form{display:grid;gap:7px;padding-top:9px}
-.matasks-continue-form textarea{width:100%;min-height:72px;resize:vertical;padding:8px 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}
-.matasks-continue-form textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.matasks-continue-form button{justify-self:start}
-.matasks-continue-unavailable{padding:9px 12px;border-top:1px solid var(--dsw-alias-border-l1)}
-.matasks-empty{padding:14px 12px;color:var(--dsw-alias-label-secondary)}
-.matasks-completion{max-width:760px;border:1px solid var(--dsw-alias-border-l2);border-radius:11px;background:var(--dsw-alias-bg-layer-1)}
-.matasks-completion-body{display:grid;gap:10px;padding:12px}
-.matasks-completion-title{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
-.matasks-original summary,.matasks-session-meta summary{cursor:pointer}
-@media(max-width:520px){.matasks-panel{gap:6px;padding:6px}.matasks-overview{gap:4px}.matasks-heading{gap:5px}.matasks-tab{max-width:100%;flex:1 1 150px}.matasks-task-head{align-items:flex-start;flex-direction:column}.matasks-activity-viewport{padding:8px}}
-@media(prefers-reduced-motion:reduce){.matasks *{scroll-behavior:auto!important;transition:none!important}}
+.matasks-history-list{display:grid;gap:8px;list-style:none;margin:0;padding:0}
+.matasks-history-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;min-width:0;padding:9px 11px;border:1px solid var(--ma-line);border-radius:9px;background:var(--ma-bg);transition:border-color 180ms ease,background-color 180ms ease}
+.matasks-history-row:hover{border-color:var(--ma-line-strong);background:var(--ma-surface-raised)}
+.matasks-history-row[data-selected=true]{border-color:var(--ma-accent);background:var(--ma-accent-soft)}
+.matasks-history-main{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}
+.matasks-history-actions{display:flex;flex-wrap:wrap;gap:6px}
+.matasks-history-actions button{min-height:28px;padding:3px 9px;font-size:12px}
+.matasks-continue{padding:11px 14px;border-top:1px solid var(--ma-line);background:var(--ma-surface)}
+.matasks-continue>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:620;color:var(--ma-text)}
+.matasks-continue-form{display:grid;gap:8px;padding-top:10px}
+.matasks-continue-form label{font-size:12px;font-weight:560;color:var(--ma-muted)}
+.matasks-continue-form textarea{width:100%;min-height:76px;resize:vertical;padding:8px 10px;line-height:1.5}
+.matasks-continue-form button{justify-self:start;border-color:var(--ma-accent-fill);background:var(--ma-accent-fill);color:var(--ma-on-accent);font-weight:600}
+.matasks-continue-form button:hover:not(:disabled){background:color-mix(in srgb,var(--ma-accent-fill) 90%,var(--ma-text));border-color:var(--ma-accent-fill);color:var(--ma-on-accent)}
+.matasks-continue-unavailable{padding:10px 14px;border-top:1px solid var(--ma-line);background:var(--ma-surface-sunken);font-size:12px}
+.matasks-empty{margin:0;padding:22px 16px;border:1px dashed var(--ma-line-strong);border-radius:11px;background:var(--ma-surface);color:var(--ma-muted);text-align:center}
+.matasks-completion{max-width:760px;padding:0;border:1px solid var(--ma-line-strong);border-radius:13px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm);overflow:hidden}
+.matasks-completion-body{display:grid;gap:10px;padding:14px 16px}
+.matasks-completion-title{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid var(--ma-line)}
+.matasks-completion-title strong{font-size:13.5px;font-weight:650;color:var(--ma-text)}
+.matasks-completion button[name=completion-open-tasks]{border-color:var(--ma-accent-fill);background:var(--ma-accent-fill);color:var(--ma-on-accent);font-weight:600}
+.matasks-completion button[name=completion-open-tasks]:hover:not(:disabled){background:color-mix(in srgb,var(--ma-accent-fill) 90%,var(--ma-text));border-color:var(--ma-accent-fill);color:var(--ma-on-accent)}
+.matasks-original{padding-top:6px;border-top:1px dashed var(--ma-line);color:var(--ma-muted);font-size:12px}
+.matasks-original summary{cursor:pointer;font-weight:550}
+@media(max-width:560px){.matasks-panel{gap:8px;padding:8px}.matasks-overview{gap:6px;padding:4px 6px 4px 10px}.matasks-heading{gap:6px}.matasks-tab{max-width:100%;flex:1 1 156px}.matasks-task-head{align-items:stretch;flex-direction:column;padding:10px 12px}.matasks-activity-viewport{padding:10px}.matasks-completion-body{padding:12px}}
+@media(max-width:380px){.matasks-overview-count{display:none}.matasks-tab{flex:1 1 100%}.matasks-telemetry>span{max-width:100%}.matasks-history-actions{width:100%}.matasks-history-actions button{flex:1 1 auto}}
+@media(prefers-reduced-motion:reduce){.matasks,.matasks *{scroll-behavior:auto!important;transition:none!important;animation:none!important;transform:none!important}}
 `
 
     function normalizeText(value) {
@@ -465,7 +490,7 @@ window.__ModuleLoader__.load({
 
     function useTaskList(parentSessionId, visible, refresh) {
       const generation = useRef(0)
-      const [state, setState] = useState(() => ({ parentSessionId, status: 'loading', tasks: [], revision: 0, error: false }))
+      const [state, setState] = useState(() => ({ parentSessionId, status: 'loading', tasks: [], revision: 0, error: false, loadSeq: 0 }))
       useEffect(() => {
         const current = ++generation.current
         if (!visible || !parentSessionId) return undefined
@@ -479,6 +504,7 @@ window.__ModuleLoader__.load({
             tasks: previous.parentSessionId === parentSessionId ? previous.tasks : [],
             revision: previous.parentSessionId === parentSessionId ? previous.revision : 0,
             error: false,
+            loadSeq: previous.parentSessionId === parentSessionId ? previous.loadSeq : 0,
           }))
           try {
             const value = await requestTasks(parentSessionId, undefined, controller.signal)
@@ -490,7 +516,14 @@ window.__ModuleLoader__.load({
                 if (right.startedAt === undefined) return -1
                 return right.startedAt - left.startedAt
               })
-            setState({ parentSessionId, status: 'ready', tasks, revision: Number.isFinite(value.revision) ? value.revision : 0, error: false })
+            setState((previous) => ({
+              parentSessionId,
+              status: 'ready',
+              tasks,
+              revision: Number.isFinite(value.revision) ? value.revision : 0,
+              error: false,
+              loadSeq: (previous.parentSessionId === parentSessionId ? previous.loadSeq : 0) + 1,
+            }))
           } catch {
             if (!active || current !== generation.current || controller.signal.aborted) return
             setState((previous) => ({ ...previous, parentSessionId, status: previous.tasks.length > 0 ? 'ready' : 'error', error: true }))
@@ -505,7 +538,9 @@ window.__ModuleLoader__.load({
           controller.abort()
         }
       }, [parentSessionId, visible, refresh])
-      return state.parentSessionId === parentSessionId ? state : { parentSessionId, status: 'loading', tasks: [], revision: 0, error: false }
+      return state.parentSessionId === parentSessionId
+        ? state
+        : { parentSessionId, status: 'loading', tasks: [], revision: 0, error: false, loadSeq: 0 }
     }
 
     function useTaskDetail(summary, parentSessionId, visible, expanded, refresh) {
@@ -1050,7 +1085,7 @@ window.__ModuleLoader__.load({
             t('tasks.continueSubmit'))))
     }
 
-    function TaskWorkspace({ summary, parentSessionId, cwd, visible, refresh, t, openFile, stateStore, tabId, panelId, manager }) {
+    function TaskWorkspace({ summary, parentSessionId, cwd, visible, refresh, t, openFile, stateStore, tabId, panelId, manager, onClear }) {
       const key = JSON.stringify([parentSessionId, summary.childId])
       const state = useMemo(() => {
         if (stateStore.has(key)) return stateStore.get(key)
@@ -1104,8 +1139,8 @@ window.__ModuleLoader__.load({
           }, t('tasks.archive')) : null,
           isTerminalTask(task) ? h('button', {
             type: 'button', name: `clear-${task.childId}`, disabled: manager.pending,
-            title: t('tasks.clearDescription'), 'aria-label': t('tasks.clearDescription'),
-            onClick: () => manager.manage('clear', { childId: task.childId }),
+            title: t('tasks.clearDescription'), 'aria-label': `${t('tasks.clear')}: ${task.label}`,
+            onClick: () => onClear(task.childId),
           }, t('tasks.clear')) : null)),
       h('div', { className: 'matasks-activity-frame' },
         h('div', {
@@ -1141,9 +1176,9 @@ window.__ModuleLoader__.load({
       return `${NS}-${safeDomId(parentSessionId)}-history-view-${safeDomId(childId)}`
     }
 
-    function TaskHistory({ tasks, parentSessionId, selectedChildId, onClose, onView, manager, t }) {
-      const backRef = useRef(null)
-      useEffect(() => { backRef.current?.focus?.() }, [])
+    function TaskHistory({ tasks, parentSessionId, selectedChildId, onClose, onView, onClear, backRef, viewRefs, manager, t }) {
+      const clearNoteId = `${NS}-${safeDomId(parentSessionId)}-clear-note`
+      useEffect(() => { backRef.current?.focus?.() }, [backRef])
       return h('section', { className: 'matasks-task-history', 'aria-label': t('tasks.history', { count: tasks.length }),
         onKeyDown: (event) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } },
       },
@@ -1152,11 +1187,11 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', name: 'history-back', ref: backRef, onClick: onClose }, t('tasks.backToCurrent'))),
         h('div', { className: 'matasks-history-body' },
           h('p', { className: 'matasks-muted' }, t(tasks.length ? 'tasks.historyDescription' : 'tasks.historyEmpty')),
-          h('p', { className: 'matasks-muted' }, t('tasks.clearDescription')),
+          h('p', { id: clearNoteId, className: 'matasks-muted' }, t('tasks.clearDescription')),
           tasks.some(isTerminalTask) ? h('button', {
             type: 'button', name: 'clear-history', disabled: manager.pending,
-            title: t('tasks.clearDescription'), 'aria-label': t('tasks.clearDescription'),
-            onClick: () => manager.manage('clear'),
+            title: t('tasks.clearDescription'), 'aria-describedby': clearNoteId,
+            onClick: () => onClear(),
           }, t('tasks.clearHistory')) : null,
           h('ul', { className: 'matasks-history-list' }, tasks.map((task) => h('li', {
             key: task.childId, className: 'matasks-history-row',
@@ -1170,17 +1205,18 @@ window.__ModuleLoader__.load({
           h('div', { className: 'matasks-history-actions' },
             h('button', {
               type: 'button', name: `history-view-${task.childId}`, id: historyViewId(parentSessionId, task.childId),
-              'aria-label': t('tasks.viewHistory'), onClick: () => onView(task.childId),
+              ref: (node) => { if (node) viewRefs.current.set(task.childId, node); else viewRefs.current.delete(task.childId) },
+              'aria-label': `${t('tasks.viewHistory')}: ${task.label}`, onClick: () => onView(task.childId),
             }, t('tasks.viewHistory')),
             h('button', {
               type: 'button', name: `restore-${task.childId}`, disabled: manager.pending,
-              title: t('tasks.restoreDescription'), 'aria-label': t('tasks.restoreDescription'),
+              title: t('tasks.restoreDescription'), 'aria-label': `${t('tasks.restore')}: ${task.label}`,
               onClick: () => manager.manage('restore', { childId: task.childId }),
             }, t('tasks.restore')),
             isTerminalTask(task) ? h('button', {
               type: 'button', name: `clear-${task.childId}`, disabled: manager.pending,
-              title: t('tasks.clearDescription'), 'aria-label': t('tasks.clearDescription'),
-              onClick: () => manager.manage('clear', { childId: task.childId }),
+              title: t('tasks.clearDescription'), 'aria-label': `${t('tasks.clear')}: ${task.label}`, 'aria-describedby': clearNoteId,
+              onClick: () => onClear(task.childId),
             }, t('tasks.clear')) : null))))))
     }
 
@@ -1207,6 +1243,11 @@ window.__ModuleLoader__.load({
       const handledFocus = useRef(new Map())
       const tabRefs = useRef(new Map())
       const historyButtonRef = useRef(null)
+      const historyBackRef = useRef(null)
+      const historyViewRefs = useRef(new Map())
+      const emptyStatusRef = useRef(null)
+      const pendingClearFocus = useRef(null)
+      const listLoadSeqRef = useRef(0)
       const historyWasOpen = useRef(false)
       useEffect(() => {
         if (historyWasOpen.current && !historyOpen) historyButtonRef.current?.focus?.()
@@ -1215,6 +1256,7 @@ window.__ModuleLoader__.load({
       const lastActiveSelection = useRef(new Map())
       const viewportStates = useRef(new Map())
       const list = useTaskList(parentSessionId, visible === true, refresh)
+      listLoadSeqRef.current = list.loadSeq
       const manager = useTaskManager(parentSessionId, visible === true, () => setRefresh((value) => value + 1), t)
       const tasks = list.tasks
       const activeTasks = tasks.filter((task) => !task.archived)
@@ -1253,6 +1295,69 @@ window.__ModuleLoader__.load({
         if (selectedSummary && !selectedSummary.archived) lastActiveSelection.current.set(parentSessionId, selectedSummary.childId)
       }, [parentSessionId, selectedSummary?.childId, selectedSummary?.archived])
 
+      useEffect(() => {
+        if (!visible || !parentSessionId) {
+          pendingClearFocus.current = null
+          return
+        }
+        const intent = pendingClearFocus.current
+        if (!intent) return
+        if (intent.parentSessionId !== parentSessionId) {
+          pendingClearFocus.current = null
+          return
+        }
+        if (list.loadSeq <= intent.baselineLoadSeq) return
+        pendingClearFocus.current = null
+        if (intent.view === 'history') {
+          if (!historyOpen) return
+          const targetHistoryId = intent.candidateIds.find((id) => historyTasks.some((item) => item.childId === id))
+          if (targetHistoryId && historyViewRefs.current.get(targetHistoryId)) {
+            historyViewRefs.current.get(targetHistoryId).focus()
+          } else {
+            historyBackRef.current?.focus?.()
+          }
+          return
+        }
+        if (historyOpen) return
+        const targetTabId = selectedIsActive ? selectedChildId : activeTasks[0]?.childId
+        if (targetTabId && tabRefs.current.get(targetTabId)) {
+          tabRefs.current.get(targetTabId).focus({ preventScroll: true })
+        } else {
+          emptyStatusRef.current?.focus?.()
+        }
+      }, [activeTasks, historyOpen, historyTasks, list.loadSeq, parentSessionId, selectedChildId, selectedIsActive, visible])
+
+      const clearFromHistory = async (childId) => {
+        const beforeIds = historyTasks.map((item) => item.childId)
+        const index = childId ? beforeIds.indexOf(childId) : -1
+        const candidateIds = index >= 0
+          ? [...beforeIds.slice(index + 1), ...beforeIds.slice(0, index).reverse()]
+          : []
+        const accepted = await manager.manage('clear', childId ? { childId } : {})
+        if (!accepted) return
+        pendingClearFocus.current = {
+          parentSessionId,
+          view: 'history',
+          candidateIds,
+          baselineLoadSeq: listLoadSeqRef.current,
+        }
+      }
+      const clearFromWorkspace = async (childId) => {
+        const beforeActiveIds = activeTasks.map((item) => item.childId)
+        const index = beforeActiveIds.indexOf(childId)
+        const nextSelectedId = index >= 0
+          ? (beforeActiveIds[index + 1] ?? beforeActiveIds[index - 1])
+          : activeTasks[0]?.childId
+        const accepted = await manager.manage('clear', { childId })
+        if (!accepted) return
+        if (nextSelectedId) setSelection({ parentSessionId, childId: nextSelectedId })
+        pendingClearFocus.current = {
+          parentSessionId,
+          view: 'workspace',
+          baselineLoadSeq: listLoadSeqRef.current,
+        }
+      }
+
       const selectTask = (childId) => { setSelection({ parentSessionId, childId }); setHistoryOpen(false) }
       const viewHistory = (childId) => {
         setSelection({ parentSessionId, childId })
@@ -1278,8 +1383,9 @@ window.__ModuleLoader__.load({
         tabRefs.current.get(childId)?.focus({ preventScroll: true })
       }
 
-      return h('div', { className: 'matasks matasks-panel' },
-        h('style', null, CSS),
+      const theme = useTheme()
+      return h('div', { className: 'matasks matasks-panel', 'data-ma-theme': theme },
+        h('style', null, `${THEME_CSS}\n${CSS}`),
         h('header', { className: 'matasks-overview' },
           h('div', { className: 'matasks-heading' },
             h('h2', null, t('tasks.title')),
@@ -1303,13 +1409,13 @@ window.__ModuleLoader__.load({
               onClick: () => setRefresh((value) => value + 1) }, h(Icon, { name: 'refresh' })))), 
         list.error ? h('p', { role: 'alert', className: 'matasks-error' }, t('tasks.historyUnavailable')) : null,
         manager.error ? h('p', { role: 'alert', className: 'matasks-error' }, manager.error) : null,
-        manager.receipt && selectedSummary?.childId === manager.receipt.childId ? h('p', { role: 'status', className: 'matasks-muted' },
+        manager.receipt && selectedSummary?.childId === manager.receipt.childId ? h('p', { role: 'status', className: 'matasks-muted matasks-receipt' },
           t('tasks.continueAccepted'), ' ',
           manager.receipt.value.subagentId ? h('code', null, manager.receipt.value.subagentId) : null) : null,
         list.status === 'loading' ? h('p', { role: 'status', className: 'matasks-empty' }, t('tasks.loading')) : null,
-        list.status === 'ready' && tasks.length === 0 ? h('p', { role: 'status', className: 'matasks-empty' }, t('tasks.empty')) : null,
+        list.status === 'ready' && tasks.length === 0 ? h('p', { role: 'status', className: 'matasks-empty', tabIndex: -1, ref: emptyStatusRef }, t('tasks.empty')) : null,
         !historyOpen && !selectedSummary && list.status === 'ready' && tasks.length > 0 && activeTasks.length === 0
-          ? h('p', { role: 'status', className: 'matasks-empty' }, t('tasks.activeEmpty')) : null,
+          ? h('p', { role: 'status', className: 'matasks-empty', tabIndex: -1, ref: emptyStatusRef }, t('tasks.activeEmpty')) : null,
         !historyOpen && activeTasks.length > 0 ? h('div', { className: 'matasks-tabs', role: 'tablist', 'aria-label': t('tasks.childTabs') },
           activeTasks.map((task, index) => h('button', {
             key: task.childId, type: 'button', name: `task-tab-${task.childId}`, role: 'tab',
@@ -1325,11 +1431,13 @@ window.__ModuleLoader__.load({
           h(StatusBadge, { status: task.status, t })))) : null,
         historyOpen ? h(TaskHistory, {
           tasks: historyTasks, parentSessionId, selectedChildId, manager, t,
+          backRef: historyBackRef, viewRefs: historyViewRefs, onClear: clearFromHistory,
           onClose: returnToCurrent, onView: viewHistory,
         }) : null,
         !historyOpen && selectedSummary ? h(TaskWorkspace, {
           key: JSON.stringify([parentSessionId, selectedSummary.childId]), summary: selectedSummary,
           parentSessionId, cwd, visible: visible === true, refresh, t, openFile, stateStore: viewportStates.current, manager,
+          onClear: clearFromWorkspace,
           tabId: selectedIsActive ? tabId(selectedSummary) : undefined,
           panelId: panelId(selectedSummary),
         }) : null)
@@ -1374,8 +1482,9 @@ window.__ModuleLoader__.load({
       const summaryText = concise(task?.output || source.summary || original)
       const historicReports = task?.reportPath ? [] : noticeReportPaths(original)
       const noticeStatus = typeof source.stopReason === 'string' ? source.stopReason : undefined
-      return h('article', { className: 'matasks matasks-completion', 'aria-label': t('completion.title') },
-        h('style', null, CSS),
+      const theme = useTheme()
+      return h('article', { className: 'matasks matasks-completion', 'data-ma-theme': theme, 'aria-label': t('completion.title') },
+        h('style', null, `${THEME_CSS}\n${CSS}`),
         h('div', { className: 'matasks-completion-body' },
           h('div', { className: 'matasks-completion-title' },
             h('strong', null, task?.label || t('completion.title')),

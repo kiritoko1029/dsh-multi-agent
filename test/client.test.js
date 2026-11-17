@@ -2,6 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
+import {
+  createUiTheme,
+  DEFAULT_THEME,
+  THEME_CHANGE_EVENT,
+  THEME_IDS,
+  THEME_PRESETS,
+  THEME_STORAGE_KEY,
+} from '../lib/ui-theme.js'
 
 const clientSource = readFileSync(new URL('../client.js', import.meta.url), 'utf8')
 
@@ -23,6 +31,7 @@ const FOCUSABLE_TAGS = new Set(['a', 'button', 'input', 'select', 'textarea', 's
 
 function isFocusableNode(type, props) {
   if (props?.disabled) return false
+  if (typeof props?.tabIndex === 'number' && props.tabIndex < 0) return false
   if (type === 'a') return typeof props?.href === 'string'
   if (FOCUSABLE_TAGS.has(type)) return true
   return typeof props?.tabIndex === 'number' && props.tabIndex >= 0
@@ -293,9 +302,48 @@ function setup(options = {}) {
     },
   })
   const forms = { 'multi-agent-router': form('router'), 'codex-provider': form('codex'), 'kimi-code-acp': form('acp'), 'agy-acp': form('agy') }
+  const storageMap = options.storageMap || new Map(options.initialTheme !== undefined ? [[THEME_STORAGE_KEY, options.initialTheme]] : [])
+  const winListeners = { storage: new Set(), [THEME_CHANGE_EVENT]: new Set() }
+  const win = options.window || {
+    localStorage: options.brokenStorage
+      ? {
+          getItem() { throw new Error('SecurityError') },
+          setItem() { throw new Error('QuotaExceededError') },
+          removeItem() { throw new Error('SecurityError') },
+        }
+      : {
+          getItem: (key) => (storageMap.has(key) ? storageMap.get(key) : null),
+          setItem: (key, val) => { storageMap.set(key, String(val)) },
+          removeItem: (key) => { storageMap.delete(key) },
+          clear: () => { storageMap.clear() },
+        },
+    addEventListener(type, fn) {
+      winListeners[type] ??= new Set()
+      winListeners[type].add(fn)
+    },
+    removeEventListener(type, fn) {
+      winListeners[type]?.delete(fn)
+    },
+    dispatchEvent(event) {
+      for (const fn of [...(winListeners[event.type] || [])]) fn(event)
+      return true
+    },
+    CustomEvent,
+  }
+  win.__ModuleLoader__ = {
+    load: ({ factory }) => {
+      const uiTheme = options.uiTheme || createUiTheme(win)
+      plugin = factory((id) => {
+        if (id === 'dsh-multi-agent/ui-theme') return uiTheme
+        assert.equal(id, 'react')
+        return runtime.React
+      })
+    },
+  }
   vm.runInNewContext(clientSource, {
-    window: { __ModuleLoader__: { load: ({ factory }) => { plugin = factory(() => runtime.React) } } },
+    window: win,
     document: doc,
+    CustomEvent,
     fetch: async (url) => {
       const owner = url.endsWith('codex') ? 'codex' : url.endsWith('agy') ? 'agy' : 'acp'
       calls.push(owner)
@@ -358,7 +406,7 @@ function setup(options = {}) {
   }, doc)
 
   return {
-    plugin, registrations, slotInjections, slotRegistry, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries, doc, mounted,
+    plugin, registrations, slotInjections, slotRegistry, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries, doc, win, winListeners, storageMap, mounted,
     headerEntry, heroEntry, overlayEntry,
     renderAll(slotProps) { return mounted.renderAll(slotProps) },
     renderHeader() { return mounted.renderAll().header },
@@ -394,6 +442,10 @@ function setup(options = {}) {
       assert.equal(slotRegistry.size, 0, 'all slot registrations must clean up')
       assert.equal(doc.listeners.keydown.size, 0, 'document keydown listeners must clean up')
       assert.equal(doc.listeners.focusin.size, 0, 'document focusin listeners must clean up')
+      if (!options.window) {
+        assert.equal(winListeners.storage.size, 0, 'window storage listeners must clean up')
+        assert.equal(winListeners[THEME_CHANGE_EVENT].size, 0, 'window theme listeners must clean up')
+      }
       assert.ok(Object.values(listeners).every((set) => set.size === 0), 'form listeners must clean up')
     },
   }
@@ -926,7 +978,7 @@ test('loading, unavailable, and readonly states still render an accessible closa
   readonly.dispose()
 })
 
-test('client styles use only --dsw-alias-* tokens, restore overlay pointer-events, and avoid Host DOM portals', async () => {
+test('client styles use only --dsw-alias-*/--ma-* tokens, restore overlay pointer-events, and avoid Host DOM portals', async () => {
   const app = setup()
   const header = app.renderHeader()
   const hero = app.renderHero()
@@ -934,12 +986,272 @@ test('client styles use only --dsw-alias-* tokens, restore overlay pointer-event
   const styles = [...nodes(header, 'style'), ...nodes(hero, 'style'), ...nodes(overlay, 'style')].map((node) => node.children.join('')).join('\n')
   const cssVars = [...styles.matchAll(/var\((--[a-zA-Z0-9-]+)/g)].map((match) => match[1])
   assert.ok(cssVars.length > 0)
-  assert.ok(cssVars.every((name) => name.startsWith('--dsw-alias-')), `unexpected CSS variable: ${cssVars.join(', ')}`)
+  assert.ok(cssVars.every((name) => name.startsWith('--dsw-alias-') || name.startsWith('--ma-')), `unexpected CSS variable: ${cssVars.join(', ')}`)
   assert.ok(!cssVars.includes('--dsw-alias-brand-primary-soft'), 'current DSH themes do not provide brand-primary-soft')
-  assert.doesNotMatch(styles, /#[0-9a-fA-F]{3,8}\b|\brgba?\(/, 'must not hardcode hex or rgb colors')
+  // Strip only non-system presets so both component CSS and [data-ma-theme="system"] are verified bare-color free.
+  const nonPresetStyles = styles.replace(/\[data-ma-theme="(?!system")[a-z-]+"\]\{[^}]*\}/g, '')
+  assert.doesNotMatch(nonPresetStyles, /#[0-9a-fA-F]{3,8}\b|\brgba?\(/, 'colors live only in non-system theme presets')
+  for (const id of THEME_IDS) assert.match(styles, new RegExp(`\\[data-ma-theme="${id}"\\]`))
+  assert.equal([...styles.matchAll(/(?:^|\n)\.ma-modal\{/g)].length, 1, 'must not append duplicate .ma-modal patch blocks')
   assert.match(styles, /\.ma-overlay-backdrop\{[^}]*pointer-events:auto/)
   assert.match(styles, /min\(1180px,calc\(100vw - 48px\)\)/)
   assert.match(styles, /85vh/)
+  assert.match(styles, /180ms/)
+  assert.match(styles, /prefers-reduced-motion:reduce/)
   assert.doesNotMatch(clientSource, /document\.body|createPortal/)
+  assert.doesNotMatch(clientSource, /[\u{1F300}-\u{1FAFF}]/u, 'must not use emoji as functional icons')
+  app.dispose()
+})
+
+function hexRgb(hex) {
+  const clean = hex.replace('#', '')
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean
+  return [
+    Number.parseInt(full.slice(0, 2), 16),
+    Number.parseInt(full.slice(2, 4), 16),
+    Number.parseInt(full.slice(4, 6), 16),
+  ]
+}
+
+function rgbaOverlay(rgbaText, baseRgb) {
+  const match = rgbaText.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?\s*\)$/)
+  assert.ok(match, `expected valid rgb/rgba color, received ${rgbaText}`)
+  const alpha = match[4] === undefined ? 1 : Number(match[4])
+  return [0, 1, 2].map((i) => Math.round(Number(match[i + 1]) * alpha + baseRgb[i] * (1 - alpha)))
+}
+
+function relativeLuminance([r, g, b]) {
+  const channel = (v) => {
+    const s = v / 255
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+}
+
+function contrastRatio(fgRgb, bgRgb) {
+  const l1 = relativeLuminance(fgRgb)
+  const l2 = relativeLuminance(bgRgb)
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+}
+
+test('all five themes exist and every non-system preset satisfies >= 4.5:1 WCAG contrast across surfaces and soft pills', () => {
+  assert.deepEqual(THEME_IDS, ['system', 'studio', 'paper', 'midnight', 'graphite'])
+  assert.equal(DEFAULT_THEME, 'system')
+  for (const id of ['studio', 'paper', 'midnight', 'graphite']) {
+    const preset = THEME_PRESETS[id]
+    assert.ok(preset, `preset ${id} must exist`)
+    assert.ok(['light', 'dark'].includes(preset.scheme))
+    const surfaces = ['bg', 'surface', 'raised', 'sunken', 'overlay']
+    const foregrounds = ['text', 'muted', 'accent', 'success', 'warn', 'error', 'idle']
+    for (const surfaceKey of surfaces) {
+      const bg = hexRgb(preset[surfaceKey])
+      for (const fgKey of foregrounds) {
+        const ratio = contrastRatio(hexRgb(preset[fgKey]), bg)
+        assert.ok(ratio >= 4.5, `${id}: ${fgKey} (${preset[fgKey]}) on ${surfaceKey} (${preset[surfaceKey]}) must be >= 4.5:1, got ${ratio.toFixed(2)}:1`)
+      }
+      for (const [softKey, fgKeys] of [
+        ['accentSoft', ['text', 'accent']],
+        ['successSoft', ['success']],
+        ['warnSoft', ['warn']],
+        ['errorSoft', ['error']],
+        ['idleSoft', ['idle']],
+      ]) {
+        const blendedBg = rgbaOverlay(preset[softKey], bg)
+        for (const fgKey of fgKeys) {
+          const ratio = contrastRatio(hexRgb(preset[fgKey]), blendedBg)
+          assert.ok(ratio >= 4.5, `${id}: ${fgKey} on ${softKey}+${surfaceKey} must be >= 4.5:1, got ${ratio.toFixed(2)}:1`)
+        }
+      }
+    }
+    const primaryButtonRatio = contrastRatio(hexRgb(preset.onAccent), hexRgb(preset.accentFill))
+    assert.ok(primaryButtonRatio >= 4.5, `${id}: onAccent on accentFill must be >= 4.5:1, got ${primaryButtonRatio.toFixed(2)}:1`)
+  }
+})
+
+test('explicit presets satisfy >= 3:1 WCAG non-text contrast for controlBorder on surface/raised/sunken without darkening dividers, and 320px/375px grids do not overflow', async (t) => {
+  for (const id of ['studio', 'paper', 'midnight', 'graphite']) {
+    await t.test(`${id} controlBorder >= 3:1 across surface, raised, and sunken`, () => {
+      const preset = THEME_PRESETS[id]
+      assert.ok(preset.controlBorder, `${id} must define dedicated controlBorder`)
+      assert.notEqual(preset.controlBorder, preset.line, `${id} controlBorder must be distinct from subtle divider line`)
+      for (const surfaceKey of ['surface', 'raised', 'sunken']) {
+        const ratio = contrastRatio(hexRgb(preset.controlBorder), hexRgb(preset[surfaceKey]))
+        assert.ok(
+          ratio >= 3.0,
+          `${id}: controlBorder (${preset.controlBorder}) on ${surfaceKey} (${preset[surfaceKey]}) must be >= 3:1, got ${ratio.toFixed(2)}:1`,
+        )
+      }
+    })
+  }
+
+  const app = setup()
+  const overlay = await app.load()
+  const styles = nodes(overlay, 'style').map((node) => node.children.join('')).join('\n')
+  assert.match(styles, /\[data-ma-theme="system"\]\{[^}]*--ma-control-border:var\(--dsw-alias-border-/)
+  assert.match(styles, /\.ma-field input,\.ma-field select,\.ma-field textarea\{[^}]*border:1px solid var\(--ma-control-border\)/)
+  assert.match(styles, /\.ma-theme-picker\{[^}]*border:1px solid var\(--ma-control-border\)/)
+  assert.match(styles, /\.ma-modal-header\{[^}]*border-bottom:1px solid var\(--ma-line\)/)
+  assert.match(styles, /\.ma-section\{[^}]*border:1px solid var\(--ma-line\)/)
+
+  // Verify M1: .ma-fields and .ma-card-fields track minimums never exceed available inner card width at 320px and 375px.
+  const fieldsTrack = styles.match(/\.ma-fields\{[^}]*grid-template-columns:repeat\(auto-fit,minmax\(min\((\d+)px,100%\),1fr\)\)/)
+  const cardFieldsTrack = styles.match(/\.ma-card-fields\{[^}]*grid-template-columns:repeat\(auto-fit,minmax\(min\((\d+)px,100%\),1fr\)\)/)
+  assert.ok(fieldsTrack, '.ma-fields must cap track min-width with min(220px,100%)')
+  assert.ok(cardFieldsTrack, '.ma-card-fields must cap track min-width with min(200px,100%)')
+  assert.match(styles, /@media\(max-width:480px\)\{[^\n]*\.ma-card-fields,\.ma-fields\{grid-template-columns:minmax\(0,1fr\)\}/)
+
+  for (const viewportWidth of [320, 375]) {
+    // At <=680px: modal = vw - 16 (border 2), scroll padding = 32, section = border 2 + padding 32, nested card = border 2 + padding 32.
+    const availableInnerWidth = (viewportWidth - 16 - 2) - 32 - (2 + 32) - (2 + 32)
+    const effectiveMinTrack = Math.min(Number(fieldsTrack[1]), availableInnerWidth)
+    assert.ok(availableInnerWidth > 0 && effectiveMinTrack <= availableInnerWidth, `no horizontal overflow at ${viewportWidth}px`)
+  }
+  app.dispose()
+})
+
+test('appearance selector persists to localStorage, syncs select and radiogroup, and responds to storage and custom events', async () => {
+  const app = setup({ lang: 'zh' })
+  let tree = await app.load()
+  assert.equal(tree.props['data-ma-theme'], 'system')
+  const themeSelect = control(tree, 'modal-theme')
+  assert.ok(themeSelect, 'header appearance select must exist')
+  assert.equal(themeSelect.props.value, 'system')
+  assert.deepEqual(themeSelect.children.map((opt) => opt.props.value), [...THEME_IDS])
+  assert.equal(control(tree, 'theme-choice-system').props['aria-checked'], true)
+  assert.equal(control(tree, 'theme-choice-midnight').props['aria-checked'], false)
+
+  // Switch via header <select>
+  app.edit('modal-theme', 'midnight')
+  tree = app.render()
+  assert.equal(tree.props['data-ma-theme'], 'midnight')
+  assert.equal(app.storageMap.get(THEME_STORAGE_KEY), 'midnight')
+  assert.equal(control(tree, 'theme-choice-midnight').props['aria-checked'], true)
+  assert.equal(control(tree, 'theme-choice-system').props['aria-checked'], false)
+
+  // Switch via sidebar radio button
+  app.click('theme-choice-paper')
+  tree = app.render()
+  assert.equal(tree.props['data-ma-theme'], 'paper')
+  assert.equal(control(tree, 'modal-theme').props.value, 'paper')
+  assert.equal(app.storageMap.get(THEME_STORAGE_KEY), 'paper')
+
+  // Close and reopen preserves stored theme
+  app.click('modal-close')
+  assert.equal(app.render(), null)
+  tree = await app.load()
+  assert.equal(tree.props['data-ma-theme'], 'paper')
+
+  // Unrelated storage key does not change theme
+  app.win.dispatchEvent({ type: 'storage', key: 'unrelated:key', newValue: 'studio' })
+  assert.equal(app.render().props['data-ma-theme'], 'paper')
+
+  // Same-origin storage update changes theme immediately
+  app.storageMap.set(THEME_STORAGE_KEY, 'graphite')
+  app.win.dispatchEvent({ type: 'storage', key: THEME_STORAGE_KEY, newValue: 'graphite' })
+  tree = app.render()
+  assert.equal(tree.props['data-ma-theme'], 'graphite')
+  assert.equal(control(tree, 'modal-theme').props.value, 'graphite')
+  assert.equal(control(tree, 'theme-choice-graphite').props['aria-checked'], true)
+
+  // Storage clear (key: null, newValue: null) falls back to system
+  app.storageMap.clear()
+  app.win.dispatchEvent({ type: 'storage', key: null, newValue: null })
+  assert.equal(app.render().props['data-ma-theme'], 'system')
+
+  // Custom event synchronization and invalid value protection
+  app.storageMap.set(THEME_STORAGE_KEY, 'studio')
+  app.win.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: 'studio' }))
+  assert.equal(app.render().props['data-ma-theme'], 'studio')
+
+  app.win.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: 'non-existent-theme' }))
+  assert.equal(app.render().props['data-ma-theme'], 'studio', 'invalid custom event detail falls back to valid stored theme')
+  app.dispose()
+})
+
+test('theme fallback handles invalid stored values, broken localStorage, and loading/unavailable modal states', () => {
+  const invalidStored = setup({ initialTheme: 'corrupted-theme' })
+  const invalidTree = invalidStored.open()
+  assert.equal(invalidTree.props['data-ma-theme'], 'system')
+  invalidStored.dispose()
+
+  const broken = setup({ brokenStorage: true, snapshots: { router: { status: 'loading', writable: false } } })
+  let loadingTree = broken.open()
+  assert.equal(loadingTree.props['data-ma-theme'], 'system')
+  assert.ok(control(loadingTree, 'modal-theme'), 'appearance selector remains available while configuration loads')
+  broken.edit('modal-theme', 'graphite')
+  loadingTree = broken.render()
+  assert.equal(loadingTree.props['data-ma-theme'], 'graphite', 'same-page theme updates work even when localStorage throws')
+  broken.dispose()
+})
+
+test('theme radiogroup implements WAI-ARIA roving tabindex, arrow wrap, Home/End, focus movement, and single Tab stop', async () => {
+  const app = setup()
+  let tree = await app.load()
+  const dialogHost = [...app.mounted.hostNodes.values()].find((node) => node.name === 'ma-modal')
+  assert.ok(dialogHost)
+
+  const assertActiveRadio = (expectedId) => {
+    tree = app.render()
+    assert.equal(tree.props['data-ma-theme'], expectedId)
+    assert.equal(control(tree, 'modal-theme').props.value, expectedId)
+    for (const id of THEME_IDS) {
+      const radio = control(tree, `theme-choice-${id}`)
+      assert.equal(radio.props['aria-checked'], id === expectedId, `aria-checked for ${id}`)
+      assert.equal(radio.props.tabIndex, id === expectedId ? 0 : -1, `tabIndex for ${id}`)
+    }
+    const tabStopRadios = dialogHost.querySelectorAll().filter((node) => node.name.startsWith('theme-choice-'))
+    assert.deepEqual(tabStopRadios.map((node) => node.name), [`theme-choice-${expectedId}`], 'only active radio enters Tab order')
+  }
+
+  assertActiveRadio('system')
+
+  const pressKey = (fromId, key, extra = {}) => {
+    let prevented = false
+    control(app.render(), `theme-choice-${fromId}`).props.onKeyDown({
+      key,
+      preventDefault() { prevented = true },
+      ...extra,
+    })
+    return prevented
+  }
+
+  // ArrowRight & ArrowDown advance and move focus to target button
+  assert.equal(pressKey('system', 'ArrowRight'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-studio')
+  assertActiveRadio('studio')
+  assert.equal(app.storageMap.get(THEME_STORAGE_KEY), 'studio')
+
+  assert.equal(pressKey('studio', 'ArrowDown'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-paper')
+  assertActiveRadio('paper')
+
+  // End jumps to last ('graphite'), ArrowRight wraps to first ('system')
+  assert.equal(pressKey('paper', 'End'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-graphite')
+  assertActiveRadio('graphite')
+
+  assert.equal(pressKey('graphite', 'ArrowRight'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-system')
+  assertActiveRadio('system')
+
+  // ArrowLeft wraps backwards from first ('system') to last ('graphite'), ArrowUp steps back
+  assert.equal(pressKey('system', 'ArrowLeft'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-graphite')
+  assertActiveRadio('graphite')
+
+  assert.equal(pressKey('graphite', 'ArrowUp'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-midnight')
+  assertActiveRadio('midnight')
+
+  // Home jumps back to first ('system')
+  assert.equal(pressKey('midnight', 'Home'), true)
+  assert.equal(app.doc.activeElement?.name, 'theme-choice-system')
+  assertActiveRadio('system')
+
+  // Non-navigation keys and composing events are ignored without preventing default
+  assert.equal(pressKey('system', 'Tab'), false)
+  assert.equal(pressKey('system', 'ArrowRight', { isComposing: true }), false)
+  assertActiveRadio('system')
+
   app.dispose()
 })

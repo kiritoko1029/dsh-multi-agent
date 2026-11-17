@@ -1,12 +1,12 @@
-# DSH 多 Agent 派发 0.9.3 — 安装与安全说明
+# DSH 多 Agent 派发 — 安装与安全说明
 
-本项目不是 DSH 官方插件。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)；0.9.3 起使用 scoped npm 包 `@kiritoko1029/dsh-multi-agent`，请从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载 `kiritoko1029-dsh-multi-agent-0.9.3.tgz` 及其 `.sha256` 校验文件。npm 发布不改变 DSH 安装方式：仍按本文使用插件管理器，不要在 profile 目录手动执行 npm / pnpm 安装。0.9.2 及更早版本不追溯发布到 npm。
+本项目不是 DSH 官方插件。源码与安装包发布在 [GitHub 仓库](https://github.com/kiritoko1029/dsh-multi-agent)；0.9.3 起使用 scoped npm 包 `@kiritoko1029/dsh-multi-agent`，请从 [Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载所选稳定版的 `kiritoko1029-dsh-multi-agent-<version>.tgz` 及其 `.sha256` 校验文件。npm 发布不改变 DSH 安装方式：仍按本文使用插件管理器，不要在 profile 目录手动执行 npm / pnpm 安装。0.9.2 及更早版本不追溯发布到 npm。
 
 0.9.3 的 Release 资产名为 `kiritoko1029-dsh-multi-agent-0.9.3.tgz`。包名同时也是插件安装身份；从旧 `dsh-multi-agent` 升级时应先备份配置并按插件管理器提示处理旧包，不要让新旧两个包同时启用。既有 0.9.2 资产名和安装方式不变。
 
 ## 一、准备环境
 
-1. DSH 必须为 `0.2.2-rc.1`、`0.2.2-rc.2` 或 `0.2.2-rc.3`；其它版本未列入兼容范围，不要通过版本豁免强行安装。
+1. 0.10.0 起 DSH 必须为 `0.2.2-rc.3`；RC1/RC2 及其它版本未列入兼容范围，不要通过版本豁免强行安装。
 2. 在自己的 DSH 中配置可用模型。仅使用 DSH 子代理时，不需要安装外部 CLI。
 3. 需要哪个外部 Agent，就在本机安装并登录哪个 CLI：Codex、Kimi Code 或 Google Antigravity（agy）。安装这个插件不会赠送账号、模型额度，也不会带入分享者的登录。
 4. “Agent 任务”面板直接使用 DSH 原生右侧栏和文件预览，无需安装第三方侧栏插件。
@@ -92,8 +92,8 @@ Windows 只接受 DSH 托管进程边界可直接启动的原生程序。`.cmd` 
 
 ## 六、兼容性与数据提醒
 
-插件沿用 rc.1 / rc.2 双版本兼容层，测试覆盖两版接口及官方固定源码的隔离契约。**这不等于在所有系统、CLI 版本和桌面窗口尺寸上完成了端到端验收；rc.2 桌面完整验收仍有限制。**
+0.10.0 起仅支持 DSH `0.2.2-rc.3`，RC1/RC2 不再属于兼容性或交付验收范围。仓库保留的历史适配代码与 RC 契约脚本仅供旧版本维护和诊断，默认测试不运行真实上游双版本矩阵。**这不等于在所有系统、CLI 版本和桌面窗口尺寸上完成了端到端验收；桌面完整验收仍有限制。**
 
-DSH rc.2 创建具名子代理后可能写入 rc.1 无法读取的会话记录。升级 DSH 前备份自己的会话存储，不要让两版进程同时读写同一份存储，也不要直接在新版记录上降级。
+新版 DSH 创建具名子代理后可能写入旧版无法读取的会话记录。升级 DSH 前备份自己的会话存储，不要让不同版本进程同时读写同一份存储，也不要直接在新版记录上降级。
 
 本项目自有代码以 [MIT 许可证](LICENSE) 发布。第三方版权与许可证见 `THIRD_PARTY_NOTICES.md`；`acp-provider.js`、`lib/codex-run.js`、`lib/provider-process-contract.js`、`lib/dsh-model.js` 和 `lib/json-rpc-line-transport.js` 包含改编自 DeepSeek Harness 的 MIT 代码，其原始声明保留在对应文件内。

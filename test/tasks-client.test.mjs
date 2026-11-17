@@ -3,6 +3,7 @@ import assert from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import vm from 'node:vm'
+import { createUiTheme, THEME_CHANGE_EVENT, THEME_IDS, THEME_STORAGE_KEY } from '../lib/ui-theme.js'
 
 const require = createRequire(import.meta.url)
 const MarkdownIt = require('markdown-it')
@@ -265,19 +266,48 @@ function setup(options = {}) {
   let mounted = Object.hasOwn(options, 'mounted') ? options.mounted : 'parent-1'
   const dictionaries = []
   const fetchImpl = options.fetch || (async () => jsonResponse({ ok: true, value: { revision: 1, tasks: [] } }))
-  const context = {
-    window: {
-      __ModuleLoader__: {
-        load(registration) {
-          moduleId = registration.id
-          plugin = registration.factory((id) => {
-            if (id === 'react') return runtime.React
-            assert.equal(id, 'markdown-it')
-            return MarkdownIt
-          })
+  const storageMap = options.storageMap || new Map(options.initialTheme !== undefined ? [[THEME_STORAGE_KEY, options.initialTheme]] : [])
+  const winListeners = { storage: new Set(), [THEME_CHANGE_EVENT]: new Set() }
+  const win = options.window || {
+    localStorage: options.brokenStorage
+      ? {
+          getItem() { throw new Error('SecurityError') },
+          setItem() { throw new Error('QuotaExceededError') },
+        }
+      : {
+          getItem: (key) => (storageMap.has(key) ? storageMap.get(key) : null),
+          setItem: (key, val) => { storageMap.set(key, String(val)) },
+          removeItem: (key) => { storageMap.delete(key) },
+          clear: () => { storageMap.clear() },
         },
-      },
+    addEventListener(type, fn) {
+      winListeners[type] ??= new Set()
+      winListeners[type].add(fn)
     },
+    removeEventListener(type, fn) {
+      winListeners[type]?.delete(fn)
+    },
+    dispatchEvent(event) {
+      for (const fn of [...(winListeners[event.type] || [])]) fn(event)
+      return true
+    },
+    CustomEvent,
+  }
+  const uiTheme = options.uiTheme || createUiTheme(win)
+  win.__ModuleLoader__ = {
+    load(registration) {
+      moduleId = registration.id
+      plugin = registration.factory((id) => {
+        if (id === 'react') return runtime.React
+        if (id === 'dsh-multi-agent/ui-theme') return uiTheme
+        assert.equal(id, 'markdown-it')
+        return MarkdownIt
+      })
+    },
+  }
+  const context = {
+    window: win,
+    CustomEvent,
     fetch: async (url, init) => {
       requests.push({ url, init })
       return fetchImpl(url, init)
@@ -334,6 +364,7 @@ function setup(options = {}) {
   const completion = slotRegistrations.find((registration) => registration.spec.name === 'conversation.chat.node')
   return {
     plugin, moduleId, requests, opened, files, tabRegistrations, slotRegistrations, slotInjections, eventDefinitions, dictionaries, clock, frames,
+    win, winListeners, storageMap, uiTheme,
     taskPanel, completion,
     renderer: runtime.renderer,
     setList(next) { listSnapshot = next; for (const listener of [...listeners]) listener() },
@@ -941,8 +972,8 @@ test('completed tasks use neutral gray and running tasks use green without chang
     assert.ok(badges.length >= 2, 'task tab and detail both show the status')
     assert.ok(badges.every((badge) => badge.props['data-tone'] === tone), status)
     const styles = styleText(tree)
-    assert.match(styles, /\.matasks-status\[data-tone=neutral\]\{color:var\(--dsw-alias-label-secondary\)\}/)
-    assert.match(styles, /\.matasks-status\[data-tone=active\]\{color:var\(--dsw-alias-state-success-primary\)\}/)
+    assert.match(styles, /\.matasks-status\[data-tone=neutral\]\{color:var\(--ma-muted\)\}/)
+    assert.match(styles, /\.matasks-status\[data-tone=active\]\{color:var\(--ma-success\)\}/)
     assert.match(styles, /\.matasks-status::before\{[^}]*background:currentColor/)
     view.dispose()
     app.dispose()
@@ -963,9 +994,14 @@ test('the panel owns one bounded activity scroller, semantic tabs and natural-he
   assert.match(styles, /\.matasks-activity-viewport\{[^}]*flex:1 1 auto;[^}]*min-height:0;[^}]*overflow-y:auto/)
   assert.match(styles, /\.matasks-task-head\{position:sticky/)
   assert.match(styles, /@media\(prefers-reduced-motion:reduce\)/)
-  for (const token of ['bg-layer-1', 'bg-layer-2', 'border-l1', 'border-l2', 'brand-primary', 'brand-primary-soft', 'label-primary', 'label-secondary', 'state-error-primary', 'state-success-primary', 'state-warn-primary', 'state-idle-primary']) {
+  for (const token of ['bg-layer-1', 'bg-layer-2', 'bg-overlay', 'border-l1', 'border-l2', 'brand-primary', 'label-primary', 'label-secondary', 'state-error-primary', 'state-success-primary', 'state-warn-primary', 'state-idle-primary']) {
     assert.match(styles, new RegExp(`--dsw-alias-${token}`))
   }
+  for (const id of THEME_IDS) assert.match(styles, new RegExp(`\\[data-ma-theme="${id}"\\]`))
+  const nonPresetStyles = styles.replace(/\[data-ma-theme="(?!system")[a-z-]+"\]\{[^}]*\}/g, '')
+  assert.doesNotMatch(nonPresetStyles, /#[0-9a-fA-F]{3,8}\b|\brgba?\(/, 'component and system styles must not contain bare hex or rgb colors')
+  assert.equal([...styles.matchAll(/(?:^|\n)\.matasks-panel\{/g)].length, 1, 'must not append duplicate .matasks-panel override blocks')
+  assert.doesNotMatch(source, /[\u{1F300}-\u{1FAFF}]/u, 'must not use emoji as functional icons')
   const baseRule = styles.match(/\.matasks\{([^}]*)\}/)?.[1] || ''
   assert.doesNotMatch(baseRule, /height:100%|overflow-y:auto/)
   assert.equal(byRole(tree, 'tablist').length, 1)
@@ -2220,6 +2256,324 @@ test('telemetry refreshes asynchronously and remains isolated between child task
   tree = await view.settle()
   assert.match(telemetryText(tree), /second-model-v2/)
   assert.match(telemetryText(tree), /Task tokens: 22/)
+  view.dispose()
+  app.dispose()
+})
+
+test('task panel and completion card read persisted theme, sync via storage and custom events, and clean up listeners', async () => {
+  const app = taskDetailApp(summary, [summary], { initialTheme: 'studio' })
+  const { view } = await renderTaskPanel(app)
+  const completion = app.renderer(app.completion.component, {
+    node: completionNode(), sessionId: 'parent-1', cwd: '/workspace',
+  })
+  await completion.settle()
+
+  assert.equal(view.tree.props['data-ma-theme'], 'studio')
+  assert.equal(completion.tree.props['data-ma-theme'], 'studio')
+
+  // Sync via writeTheme / custom event
+  app.uiTheme.writeTheme('midnight')
+  assert.equal(view.render().props['data-ma-theme'], 'midnight')
+  assert.equal(completion.render().props['data-ma-theme'], 'midnight')
+  assert.equal(app.storageMap.get(THEME_STORAGE_KEY), 'midnight')
+
+  // Sync via cross-tab storage event
+  app.storageMap.set(THEME_STORAGE_KEY, 'paper')
+  app.win.dispatchEvent({ type: 'storage', key: THEME_STORAGE_KEY, newValue: 'paper' })
+  assert.equal(view.render().props['data-ma-theme'], 'paper')
+  assert.equal(completion.render().props['data-ma-theme'], 'paper')
+
+  // Sync via external custom event on the shared window
+  app.storageMap.set(THEME_STORAGE_KEY, 'graphite')
+  app.win.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: 'graphite' } }))
+  assert.equal(view.render().props['data-ma-theme'], 'graphite')
+  assert.equal(completion.render().props['data-ma-theme'], 'graphite')
+
+  completion.dispose()
+  view.dispose()
+  assert.equal(app.winListeners.storage.size, 0, 'task and completion storage listeners must clean up')
+  assert.equal(app.winListeners[THEME_CHANGE_EVENT].size, 0, 'task and completion theme listeners must clean up')
+  app.dispose()
+})
+
+test('separate theme instances on one window still sync task panel when localStorage throws', async () => {
+  const winListeners = new Map()
+  const sharedWin = {
+    localStorage: {
+      getItem() { throw new Error('SecurityError') },
+      setItem() { throw new Error('SecurityError') },
+    },
+    addEventListener(type, fn) {
+      if (!winListeners.has(type)) winListeners.set(type, new Set())
+      winListeners.get(type).add(fn)
+    },
+    removeEventListener(type, fn) {
+      winListeners.get(type)?.delete(fn)
+    },
+    dispatchEvent(event) {
+      for (const fn of [...(winListeners.get(event.type) || [])]) fn(event)
+      return true
+    },
+    CustomEvent,
+  }
+  const settingsSideTheme = createUiTheme(sharedWin)
+  const tasksSideTheme = createUiTheme(sharedWin)
+  const app = taskDetailApp(summary, [summary], { window: sharedWin, uiTheme: tasksSideTheme })
+  const { view } = await renderTaskPanel(app)
+  assert.equal(view.tree.props['data-ma-theme'], 'system')
+
+  settingsSideTheme.writeTheme('midnight')
+  assert.equal(view.render().props['data-ma-theme'], 'midnight')
+
+  settingsSideTheme.writeTheme('paper')
+  assert.equal(view.render().props['data-ma-theme'], 'paper')
+
+  view.dispose()
+  app.dispose()
+})
+
+function accessibleNameOf(buttonNode) {
+  const ariaLabel = typeof buttonNode.props?.['aria-label'] === 'string' ? buttonNode.props['aria-label'].trim() : ''
+  return ariaLabel || text(buttonNode).trim()
+}
+
+test('clear, restore, and history action buttons start their accessible name with the visible label, append task labels in repeated rows, and keep descriptions supplemental', async () => {
+  const tasks = [
+    { ...summary, childId: 'active-done', label: 'Active completed task', status: 'completed', startedAt: 3000, archived: false },
+    { ...summary, childId: 'hist-a', label: 'First archived task', status: 'completed', startedAt: 2000, archived: true },
+    { ...summary, childId: 'hist-b', label: 'Second archived task', status: 'error', startedAt: 1000, archived: true },
+  ]
+  const app = taskDetailApp((url) => {
+    const childId = new URLSearchParams(url.split('?')[1]).get('childId')
+    return tasks.find((item) => item.childId === childId)
+  }, tasks)
+  const { view } = await renderTaskPanel(app)
+  let tree = view.tree
+
+  // Workspace single clear button
+  const workspaceClear = control(tree, 'clear-active-done')
+  assert.ok(workspaceClear)
+  const workspaceVisible = text(workspaceClear).trim()
+  assert.equal(workspaceVisible, 'Clear panel record')
+  assert.ok(accessibleNameOf(workspaceClear).startsWith(workspaceVisible), `accessible name "${accessibleNameOf(workspaceClear)}" must start with visible label "${workspaceVisible}"`)
+  assert.match(workspaceClear.props.title, /Clear only removes this panel record/)
+
+  // Open History view
+  control(tree, 'open-history').props.onClick()
+  tree = await view.settle()
+
+  const batchClear = control(tree, 'clear-history')
+  assert.ok(batchClear)
+  assert.equal(text(batchClear).trim(), 'Clear archived history')
+  assert.ok(accessibleNameOf(batchClear).startsWith('Clear archived history'))
+  const noteId = batchClear.props['aria-describedby']
+  assert.ok(noteId, 'batch clear must reference supplemental description via aria-describedby')
+  const noteNode = nodes(tree).find((node) => node.props?.id === noteId)
+  assert.ok(noteNode, 'aria-describedby target must exist in DOM')
+  assert.match(text(noteNode), /Clear only removes this panel record/)
+
+  const seenRestoreNames = new Set()
+  const seenClearNames = new Set()
+  for (const [id, label] of [['hist-a', 'First archived task'], ['hist-b', 'Second archived task']]) {
+    const viewBtn = control(tree, `history-view-${id}`)
+    const restoreBtn = control(tree, `restore-${id}`)
+    const clearBtn = control(tree, `clear-${id}`)
+    for (const btn of [viewBtn, restoreBtn, clearBtn]) {
+      const visibleLabel = text(btn).trim()
+      const accName = accessibleNameOf(btn)
+      assert.ok(visibleLabel.length > 0)
+      assert.ok(accName.startsWith(visibleLabel), `${btn.props.name} accessible name "${accName}" must start with "${visibleLabel}"`)
+      assert.ok(accName.includes(label), `${btn.props.name} accessible name "${accName}" must include "${label}"`)
+    }
+    assert.equal(clearBtn.props['aria-describedby'], noteId)
+    assert.match(restoreBtn.props.title, /Restores only the panel tab/)
+    seenRestoreNames.add(accessibleNameOf(restoreBtn))
+    seenClearNames.add(accessibleNameOf(clearBtn))
+  }
+  assert.equal(seenRestoreNames.size, 2, 'repeated restore buttons must have distinct accessible names')
+  assert.equal(seenClearNames.size, 2, 'repeated clear buttons must have distinct accessible names')
+
+  view.dispose()
+  app.dispose()
+})
+
+test('user-initiated clear restores focus across first, last, and sole items in both history and current views without background polling focus theft', async () => {
+  // Part 1: History view (first -> next row, last -> previous row, sole -> history-back) + polling check + failure check
+  const clock = timers()
+  let failNextClear = false
+  let historyItems = [
+    { ...summary, childId: 'h-first', label: 'History First', status: 'completed', startedAt: 3000, archived: true },
+    { ...summary, childId: 'h-mid', label: 'History Middle', status: 'completed', startedAt: 2000, archived: true },
+    { ...summary, childId: 'h-last', label: 'History Last', status: 'completed', startedAt: 1000, archived: true },
+  ]
+  const historyFocusLog = []
+  const historyApp = setup({
+    clock,
+    fetch: async (url, init = {}) => {
+      if (init.method === 'POST') {
+        const body = JSON.parse(init.body)
+        if (body.action === 'clear') {
+          if (failNextClear) return jsonResponse({ ok: false, error: { message: 'Host busy' } }, false)
+          historyItems = body.childId ? historyItems.filter((item) => item.childId !== body.childId) : []
+        }
+        return jsonResponse({ ok: true, value: { childId: body.childId } })
+      }
+      const childId = new URLSearchParams(url.split('?')[1]).get('childId')
+      return jsonResponse(childId
+        ? { ok: true, value: { task: historyItems.find((item) => item.childId === childId) || null } }
+        : { ok: true, value: { revision: 1, tasks: historyItems } })
+    },
+  })
+
+  const historyView = renderSidebarBody(
+    historyApp,
+    { scope: { sessionId: 'parent-1', cwd: '/workspace' }, tab: { meta: {} }, visible: true },
+    {
+      createNode(nodeProps) {
+        if (nodeProps.className === 'matasks-activity-viewport') return mockViewport()
+        const tag = nodeProps.name || (nodeProps.className?.includes('matasks-empty') ? 'empty-status' : '')
+        return tag ? { focus: () => historyFocusLog.push(tag) } : {}
+      },
+    },
+  )
+  let tree = await historyView.settle()
+  control(tree, 'open-history').props.onClick()
+  tree = await historyView.settle()
+  assert.equal(historyFocusLog.at(-1), 'history-back', 'opening history focuses back button')
+  historyFocusLog.length = 0
+
+  // Background polling before any user clear must never steal focus
+  await clock.advance(3000)
+  await historyView.settle()
+  assert.deepEqual(historyFocusLog, [], 'background polling must not move focus')
+
+  // Failed clear must not move focus
+  failNextClear = true
+  await control(historyView.tree, 'clear-h-first').props.onClick()
+  tree = await historyView.settle()
+  assert.deepEqual(historyFocusLog, [], 'failed clear must not move focus')
+  failNextClear = false
+
+  // Clear FIRST history item ('h-first') -> focuses next row view button ('history-view-h-mid')
+  await control(tree, 'clear-h-first').props.onClick()
+  tree = await historyView.settle()
+  assert.deepEqual(historyFocusLog, ['history-view-h-mid'])
+  historyFocusLog.length = 0
+
+  // Clear LAST history item ('h-last' from ['h-mid', 'h-last']) -> focuses previous row view button ('history-view-h-mid')
+  await control(tree, 'clear-h-last').props.onClick()
+  tree = await historyView.settle()
+  assert.deepEqual(historyFocusLog, ['history-view-h-mid'])
+  historyFocusLog.length = 0
+
+  // Clear SOLE remaining history item ('h-mid') -> focuses 'history-back'
+  await control(tree, 'clear-h-mid').props.onClick()
+  tree = await historyView.settle()
+  assert.deepEqual(historyFocusLog, ['history-back'])
+  historyFocusLog.length = 0
+
+  // Subsequent polling after focus restoration must never re-focus
+  await clock.advance(3000)
+  await historyView.settle()
+  assert.deepEqual(historyFocusLog, [], 'subsequent polling after clear must not steal focus')
+  historyView.dispose()
+  historyApp.dispose()
+
+  // Part 2: Current workspace view (first -> next selected tab, last -> previous selected tab, sole -> focusable empty status)
+  const activeClock = timers()
+  let activeItems = [
+    { ...summary, childId: 'a-first', label: 'Active First', status: 'completed', startedAt: 3000, archived: false },
+    { ...summary, childId: 'a-mid', label: 'Active Middle', status: 'completed', startedAt: 2000, archived: false },
+    { ...summary, childId: 'a-last', label: 'Active Last', status: 'completed', startedAt: 1000, archived: false },
+  ]
+  const activeFocusLog = []
+  const activeApp = setup({
+    clock: activeClock,
+    fetch: async (url, init = {}) => {
+      if (init.method === 'POST') {
+        const body = JSON.parse(init.body)
+        if (body.action === 'clear') {
+          activeItems = activeItems.filter((item) => item.childId !== body.childId)
+        }
+        return jsonResponse({ ok: true, value: { childId: body.childId } })
+      }
+      const childId = new URLSearchParams(url.split('?')[1]).get('childId')
+      return jsonResponse(childId
+        ? { ok: true, value: { task: activeItems.find((item) => item.childId === childId) || null } }
+        : { ok: true, value: { revision: 1, tasks: activeItems } })
+    },
+  })
+
+  const activeView = renderSidebarBody(
+    activeApp,
+    { scope: { sessionId: 'parent-1', cwd: '/workspace' }, tab: { meta: {} }, visible: true },
+    {
+      createNode(nodeProps) {
+        if (nodeProps.className === 'matasks-activity-viewport') return mockViewport()
+        if (nodeProps.role === 'tab') return { focus: () => activeFocusLog.push(nodeProps.name) }
+        if (nodeProps.className === 'matasks-empty' && nodeProps.tabIndex === -1) {
+          return { focus: () => activeFocusLog.push('empty-status') }
+        }
+        return {}
+      },
+    },
+  )
+  let activeTree = await activeView.settle()
+  assert.equal(workspace(activeTree).props['data-task-id'], 'a-first')
+
+  // Clear FIRST active task ('a-first') -> selects & focuses 'task-tab-a-mid'
+  await control(activeTree, 'clear-a-first').props.onClick()
+  activeTree = await activeView.settle()
+  assert.equal(workspace(activeTree).props['data-task-id'], 'a-mid')
+  assert.deepEqual(activeFocusLog, ['task-tab-a-mid'])
+  activeFocusLog.length = 0
+
+  // Select LAST active task ('a-last') and clear it -> selects & focuses 'task-tab-a-mid'
+  control(activeTree, 'task-tab-a-last').props.onClick()
+  activeTree = await activeView.settle()
+  assert.equal(workspace(activeTree).props['data-task-id'], 'a-last')
+  await control(activeTree, 'clear-a-last').props.onClick()
+  activeTree = await activeView.settle()
+  assert.equal(workspace(activeTree).props['data-task-id'], 'a-mid')
+  assert.deepEqual(activeFocusLog, ['task-tab-a-mid'])
+  activeFocusLog.length = 0
+
+  // Clear SOLE remaining active task ('a-mid') -> renders empty status with tabIndex=-1 and focuses it
+  await control(activeTree, 'clear-a-mid').props.onClick()
+  activeTree = await activeView.settle()
+  const emptyStatus = nodes(activeTree, 'p').find((node) => node.props.className === 'matasks-empty')
+  assert.ok(emptyStatus)
+  assert.equal(emptyStatus.props.role, 'status')
+  assert.equal(emptyStatus.props.tabIndex, -1)
+  assert.deepEqual(activeFocusLog, ['empty-status'])
+  activeFocusLog.length = 0
+
+  // Background polling in empty state never re-steals focus
+  await activeClock.advance(3000)
+  await activeView.settle()
+  assert.deepEqual(activeFocusLog, [], 'background polling must not focus empty status repeatedly')
+
+  activeView.dispose()
+  activeApp.dispose()
+})
+
+test('task controls use dedicated --ma-control-border and session metadata popover stays bounded by a narrow 280px sidebar', async () => {
+  const app = taskDetailApp(summary)
+  const { view, tree } = await renderTaskPanel(app)
+  const styles = styleText(tree)
+  assert.match(styles, /\.matasks :is\(input,select,textarea\)\{[^}]*border:1px solid var\(--ma-control-border\)/)
+  const dlRule = styles.match(/\.matasks-session-meta dl\{([^}]*)\}/)?.[1] || ''
+  assert.match(dlRule, /width:min\(368px,100%,calc\(100vw - 24px\)\)/)
+  assert.match(dlRule, /max-width:100%/)
+
+  // Wide 1440px viewport + 280px sidebar (.matasks-panel padding 10px*2 => 260px .matasks-overview containing block)
+  const viewportWidth = 1440
+  const sidebarWidth = 280
+  const containingOverviewWidth = sidebarWidth - 20
+  const resolvedPopoverWidth = Math.min(368, containingOverviewWidth, viewportWidth - 24)
+  assert.equal(resolvedPopoverWidth, 260)
+  assert.ok(resolvedPopoverWidth <= containingOverviewWidth, 'popover must never exceed narrow sidebar containing block')
+
   view.dispose()
   app.dispose()
 })
