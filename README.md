@@ -122,7 +122,7 @@ DSH Subagent Manager
 - `selectionMode`
   - `auto`：主 Agent 按路由规则给出 `agent`；未选择时使用 `defaultAgent`，未配置默认值则报错，不会静默乱派。
   - `ask-if-ambiguous`：明确匹配时自动执行，未给出 `agent` 时弹出选择。
-  - `always-ask`：主 Agent 可以推荐，但每次由用户最终选择。
+  - `always-ask`：主 Agent 可以推荐，但每次由用户最终选择；续接旧任务时也会重新询问 Agent，并在同一张卡片中选择复用旧会话或新建会话。
 - `defaultAgent`：可选的自动路由兜底 Agent。
 - `routes`：表单中可增删的 `Agent + 提示词` 规则行，直接用自然语言描述哪类任务适合哪个 Agent。
 - `additionalInstructions`：补充路由偏好，例如“用户明确点名时优先”。
@@ -311,7 +311,7 @@ Report path: <absolute-report-path>
 
 - 已完成、已中止和错误任务自动归档。顶部“历史任务”入口打开独立的历史视图，列表独立滚动，不与当前任务消息区上下叠放；查看历史详情时收起列表，并可返回先前活动任务、恢复阅读位置。正在查看的任务结束时保留详情，不会自动打开历史列表。历史提供查看、恢复到活动标签和清理；恢复标签本身不会启动模型。
 - 清理只从面板列表隐藏终态任务并释放活动流水，保留磁盘报告和底层会话。主 Agent 可按仍保留的逻辑 childId 查询、恢复或续接；清理不等同于删除会话，历史上限淘汰的记录不保证仍可通过本插件访问。
-- 面板“继续指挥”或主 Agent 的 `continue_agent({ childId, message, expected_output?, language? })` 调用同一业务入口。续接开始后回到活动区，下一轮结束再次归档。只允许本父会话的终态任务，拒绝重复并发续接。
+- 面板“继续指挥”或主 Agent 的 `continue_agent({ childId, message, expected_output?, language? })` 调用同一业务入口。续接开始后回到活动区，下一轮结束再次归档。只允许本父会话的终态任务，拒绝重复并发续接。`always-ask` 下会先在同一次询问中选择 Agent 与会话方式；选择新建时创建独立任务和新报告，不携带旧会话标识，Agent 或 Provider 不兼容时不会静默复用。
 - DSH：通过原生 `sendMessage` 唤起同一子会话。Codex：新任务使用持久 thread，后续 `thread/resume` 复用它。Kimi：按能力优先 `session/resume`，兼容 `session/load`。agy：使用 `session/load` 确认保存的历史存在；两者均屏蔽旧消息回放。
 - 外部续接会创建新的 managed activation，但面板保持同一个逻辑任务，通过内部别名关联各轮；不能把新 conversation 当成旧会话复用。缺失原始 ID、远端历史已被删除、能力不支持或工作区不匹配时直接报错，不静默重新派发。
 - 升级前的 Codex 临时线程不落盘、Kimi 原始 ID 未记录；这些旧任务无法通过本插件可靠恢复。新持久记录才提供外部续接能力。外部恢复沿用原工作区和模型，当前审批策略仍逐轮执行。

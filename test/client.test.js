@@ -466,7 +466,7 @@ const listValues = (tree, name) => {
 const textOf = (tree) => {
   if (tree === null || tree === undefined || typeof tree === 'boolean') return ''
   if (typeof tree === 'string' || typeof tree === 'number') return String(tree)
-  if (tree.type === 'style') return ''
+  if (tree.type === 'style' || tree.props?.role === 'tooltip') return ''
   return (tree.children || []).map(textOf).join(' ')
 }
 
@@ -492,7 +492,11 @@ test('removes settings.section and registers header, new-session, and overlay se
   assert.equal(initial.overlay, null, 'overlay must render null when closed')
   const trigger = control(initial.header, 'multi-agent-dispatch-trigger')
   assert.equal(trigger.props['aria-label'], '多 Agent 派发')
-  assert.equal(trigger.props.title, '打开多 Agent 派发设置')
+  assert.equal(trigger.props.title, undefined)
+  assert.equal(trigger.props['aria-describedby'], 'multi-agent-dispatch-trigger-tooltip')
+  const triggerTooltip = nodes(trigger, 'span').find((node) => node.props.role === 'tooltip')
+  assert.equal(triggerTooltip.props.id, 'multi-agent-dispatch-trigger-tooltip')
+  assert.equal(triggerTooltip.children.join(''), '多 Agent 派发')
   assert.equal(trigger.props['aria-haspopup'], 'dialog')
   assert.equal(trigger.props['aria-expanded'], false)
   assert.equal(textOf(trigger).trim(), '', 'header trigger must be icon-only')
@@ -500,6 +504,8 @@ test('removes settings.section and registers header, new-session, and overlay se
   const headerCss = nodes(initial.header, 'style')[0].children.join('')
   assert.match(headerCss, /\.ma-header-btn\{[^}]*border:0;[^}]*background:transparent/)
   assert.doesNotMatch(headerCss, /\.ma-header-btn:hover[^}]*background:/)
+  assert.match(headerCss, /\.ma-header-btn:hover:not\(:disabled\) \.ma-header-tooltip/)
+  assert.match(headerCss, /\.ma-header-btn:focus-visible:not\(:disabled\) \.ma-header-tooltip/)
 
   const heroTrigger = control(initial.hero, 'multi-agent-dispatch-hero-trigger')
   assert.ok(heroTrigger, 'new session dispatch button must exist')
@@ -523,6 +529,37 @@ test('removes settings.section and registers header, new-session, and overlay se
   assert.equal(control(tree, 'acp.reasoningEffort').props.value, 'max')
   assert.equal(control(tree, 'codex.model').props.value, 'gpt-test')
   assert.equal(control(tree, 'acp.args').props.value, '[\n  "acp"\n]')
+  app.dispose()
+})
+
+test('header tooltip supports hover bridging, Escape dismissal and clean re-entry', () => {
+  const app = setup({ lang: 'zh' })
+  let header = app.renderHeader()
+  let trigger = control(header, 'multi-agent-dispatch-trigger')
+  let stopped = 0
+  const event = { key: 'Escape', stopPropagation() { stopped += 1 } }
+  trigger.props.onKeyDown(event)
+  header = app.renderHeader()
+  trigger = control(header, 'multi-agent-dispatch-trigger')
+  assert.equal(trigger.props['data-tooltip-dismissed'], 'true')
+  assert.equal(stopped, 1)
+  trigger.props.onPointerEnter()
+  header = app.renderHeader()
+  trigger = control(header, 'multi-agent-dispatch-trigger')
+  assert.equal(trigger.props['data-tooltip-dismissed'], undefined, 'a new hover cycle re-arms the tooltip')
+  trigger.props.onKeyDown(event)
+  trigger = control(app.renderHeader(), 'multi-agent-dispatch-trigger')
+  trigger.props.onBlur()
+  trigger = control(app.renderHeader(), 'multi-agent-dispatch-trigger')
+  assert.equal(trigger.props['data-tooltip-dismissed'], undefined, 'blur resets keyboard dismissal')
+
+  const tooltip = nodes(trigger, 'span').find((node) => node.props.role === 'tooltip')
+  tooltip.props.onClick({ stopPropagation() { stopped += 1 } })
+  assert.equal(stopped, 3, 'clicking the bubble never activates the dispatch button')
+  const styles = nodes(header, 'style')[0].children.join('')
+  assert.match(styles, /\.ma-header-tooltip::before\{[^}]*top:-7px;[^}]*height:7px/)
+  assert.match(styles, /pointer-events:auto;transform:translateY\(0\)/)
+  assert.match(styles, /data-tooltip-dismissed='true'.*pointer-events:none!important/)
   app.dispose()
 })
 
@@ -561,6 +598,11 @@ test('header shows compact live counts and opens the shared task panel', () => {
   assert.equal(status.props['aria-label'], '2 个子 Agent 运行中，1 个异常，点击打开任务面板')
   assert.equal(textOf(status).trim().replace(/\s+/g, ' '), '2 1')
   assert.equal(nodes(status, 'svg').length, 2, 'running and error states need distinct icons')
+  const statusTooltip = nodes(status, 'span').find((node) => node.props.role === 'tooltip')
+  assert.equal(statusTooltip.props.id, 'multi-agent-task-status-tooltip')
+  assert.equal(statusTooltip.children.join(''), '2 个子 Agent 运行中，1 个异常，点击打开任务面板')
+  assert.equal(status.props.title, undefined)
+  assert.equal(status.props['aria-describedby'], statusTooltip.props.id)
   status.props.onClick()
   assert.deepEqual(read, [], 'only the visible task panel acknowledges errors')
   assert.deepEqual(opened, [['parent-1', 'child-running']])
@@ -1231,7 +1273,7 @@ test('explicit presets satisfy >= 3:1 WCAG non-text contrast for controlBorder o
   app.dispose()
 })
 
-test('appearance selector persists to localStorage, syncs select and radiogroup, and responds to storage and custom events', async () => {
+test('header appearance selector persists to localStorage and responds to events without duplicate sidebar theme controls', async () => {
   const app = setup({ lang: 'zh' })
   let tree = await app.load()
   assert.equal(tree.props['data-ma-theme'], 'system')
@@ -1239,19 +1281,17 @@ test('appearance selector persists to localStorage, syncs select and radiogroup,
   assert.ok(themeSelect, 'header appearance select must exist')
   assert.equal(themeSelect.props.value, 'system')
   assert.deepEqual(themeSelect.children.map((opt) => opt.props.value), [...THEME_IDS])
-  assert.equal(control(tree, 'theme-choice-system').props['aria-checked'], true)
-  assert.equal(control(tree, 'theme-choice-midnight').props['aria-checked'], false)
+  assert.equal(nodes(tree, 'button').some((node) => node.props.name?.startsWith('theme-choice-')), false)
+  assert.equal(nodes(tree, 'div').some((node) => node.props.className === 'ma-appearance-panel'), false)
 
   // Switch via header <select>
   app.edit('modal-theme', 'midnight')
   tree = app.render()
   assert.equal(tree.props['data-ma-theme'], 'midnight')
   assert.equal(app.storageMap.get(THEME_STORAGE_KEY), 'midnight')
-  assert.equal(control(tree, 'theme-choice-midnight').props['aria-checked'], true)
-  assert.equal(control(tree, 'theme-choice-system').props['aria-checked'], false)
 
-  // Switch via sidebar radio button
-  app.click('theme-choice-paper')
+  // Change again through the single header select
+  app.edit('modal-theme', 'paper')
   tree = app.render()
   assert.equal(tree.props['data-ma-theme'], 'paper')
   assert.equal(control(tree, 'modal-theme').props.value, 'paper')
@@ -1273,7 +1313,6 @@ test('appearance selector persists to localStorage, syncs select and radiogroup,
   tree = app.render()
   assert.equal(tree.props['data-ma-theme'], 'graphite')
   assert.equal(control(tree, 'modal-theme').props.value, 'graphite')
-  assert.equal(control(tree, 'theme-choice-graphite').props['aria-checked'], true)
 
   // Storage clear (key: null, newValue: null) falls back to system
   app.storageMap.clear()
@@ -1306,74 +1345,18 @@ test('theme fallback handles invalid stored values, broken localStorage, and loa
   broken.dispose()
 })
 
-test('theme radiogroup implements WAI-ARIA roving tabindex, arrow wrap, Home/End, focus movement, and single Tab stop', async () => {
-  const app = setup()
-  let tree = await app.load()
-  const dialogHost = [...app.mounted.hostNodes.values()].find((node) => node.name === 'ma-modal')
-  assert.ok(dialogHost)
-
-  const assertActiveRadio = (expectedId) => {
-    tree = app.render()
-    assert.equal(tree.props['data-ma-theme'], expectedId)
-    assert.equal(control(tree, 'modal-theme').props.value, expectedId)
-    for (const id of THEME_IDS) {
-      const radio = control(tree, `theme-choice-${id}`)
-      assert.equal(radio.props['aria-checked'], id === expectedId, `aria-checked for ${id}`)
-      assert.equal(radio.props.tabIndex, id === expectedId ? 0 : -1, `tabIndex for ${id}`)
-    }
-    const tabStopRadios = dialogHost.querySelectorAll().filter((node) => node.name.startsWith('theme-choice-'))
-    assert.deepEqual(tabStopRadios.map((node) => node.name), [`theme-choice-${expectedId}`], 'only active radio enters Tab order')
-  }
-
-  assertActiveRadio('system')
-
-  const pressKey = (fromId, key, extra = {}) => {
-    let prevented = false
-    control(app.render(), `theme-choice-${fromId}`).props.onKeyDown({
-      key,
-      preventDefault() { prevented = true },
-      ...extra,
-    })
-    return prevented
-  }
-
-  // ArrowRight & ArrowDown advance and move focus to target button
-  assert.equal(pressKey('system', 'ArrowRight'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-studio')
-  assertActiveRadio('studio')
-  assert.equal(app.storageMap.get(THEME_STORAGE_KEY), 'studio')
-
-  assert.equal(pressKey('studio', 'ArrowDown'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-paper')
-  assertActiveRadio('paper')
-
-  // End jumps to last ('graphite'), ArrowRight wraps to first ('system')
-  assert.equal(pressKey('paper', 'End'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-graphite')
-  assertActiveRadio('graphite')
-
-  assert.equal(pressKey('graphite', 'ArrowRight'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-system')
-  assertActiveRadio('system')
-
-  // ArrowLeft wraps backwards from first ('system') to last ('graphite'), ArrowUp steps back
-  assert.equal(pressKey('system', 'ArrowLeft'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-graphite')
-  assertActiveRadio('graphite')
-
-  assert.equal(pressKey('graphite', 'ArrowUp'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-midnight')
-  assertActiveRadio('midnight')
-
-  // Home jumps back to first ('system')
-  assert.equal(pressKey('midnight', 'Home'), true)
-  assert.equal(app.doc.activeElement?.name, 'theme-choice-system')
-  assertActiveRadio('system')
-
-  // Non-navigation keys and composing events are ignored without preventing default
-  assert.equal(pressKey('system', 'Tab'), false)
-  assert.equal(pressKey('system', 'ArrowRight', { isComposing: true }), false)
-  assertActiveRadio('system')
-
+test('sidebar removes duplicate theme radios and close icon has legible geometry', async () => {
+  const app = setup({ lang: 'zh' })
+  const tree = await app.load()
+  assert.ok(control(tree, 'modal-theme'), 'the header select remains the single appearance control')
+  assert.equal(nodes(tree, 'button').some((node) => node.props.name?.startsWith('theme-choice-')), false)
+  const close = control(tree, 'modal-close')
+  const icon = nodes(close, 'svg')[0]
+  assert.equal(icon.props.className, 'ma-modal-close-icon')
+  assert.equal(icon.props.strokeWidth, 2.2)
+  assert.equal(icon.children.length, 2)
+  const styles = nodes(tree, 'style').map((node) => node.children.join('')).join('\n')
+  assert.match(styles, /\.ma-modal-close\{[^}]*width:36px;height:36px/)
+  assert.match(styles, /\.ma-modal-close svg\{width:20px;height:20px\}/)
   app.dispose()
 })

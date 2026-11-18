@@ -1,7 +1,7 @@
 import z from '@deepseek-ai/schemastery'
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
-import { agentConfigs, answerAgent, composeTaskPrompt, routingGuidance, validateAgentChoice } from './lib/router-core.js'
+import { agentConfigs, askAgent, composeTaskPrompt, routingGuidance, validateAgentChoice } from './lib/router-core.js'
 import { currentRouterConfig } from './lib/config.js'
 import { resolveReportPath } from './lib/reports.js'
 import { createDshModelResolver } from './lib/dsh-model.js'
@@ -96,30 +96,7 @@ async function chooseAgent(ctx, config, args, exec) {
     throw new Error('No agent was selected. Choose `agent` using the configured routing rules, configure `defaultAgent`, or use an ask selection mode.')
   }
   if (recommended && config.selectionMode === 'ask-if-ambiguous') return { agent: recommended, route: 'model' }
-  const agents = agentConfigs(config)
-  if (agents.length === 0) throw new Error('No external agents are enabled')
-  const options = agents.map((agent) => ({
-    ...agent,
-    baseLabel: agent.label,
-    label: recommended?.id === agent.id ? `${agent.label} (Recommended)` : agent.label,
-    description: recommended?.id === agent.id ? `Recommended by the parent. ${agent.description}` : agent.description,
-  }))
-  if (new Set(options.map((option) => option.label)).size !== options.length) throw new Error('Agent option labels are ambiguous after adding the recommendation marker; make each configured label unique and avoid the `(Recommended)` suffix')
-  const answer = await ctx.userQuestions.ask({
-    questions: [{
-      id: 'dispatch-agent',
-      header: 'Choose agent',
-      question: `Which agent should run “${args.description}”?`,
-      detail: recommended ? `The parent recommends ${recommended.label}. The task starts after your selection.` : 'The parent could not choose confidently from the routing rules.',
-      options: options.map(({ label, description }) => ({ label, description })),
-    }],
-    agent: exec.agent,
-    signal: exec.signal,
-    wait: { callId: exec.callId },
-  })
-  const selected = answerAgent(answer, options)
-  if (!selected) return undefined
-  return { agent: validateAgentChoice(config, selected), route: 'user' }
+  return askAgent(ctx, config, recommended, args.description, exec)
 }
 
 export function apply(ctx, config) {
@@ -129,16 +106,14 @@ export function apply(ctx, config) {
   if (agents.length === 0) throw new Error('multi-agent-router requires at least one enabled agent')
   if (new Set(agents.map((agent) => agent.label)).size !== agents.length) throw new Error('multi-agent-router requires unique agent labels for user selection')
   validateAgentChoice(initialConfig, initialConfig.defaultAgent)
-  const resolveDshModel = createDshModelResolver(ctx)
   const resolveTaskLanguage = createTaskLanguageResolver(ctx)
-  const cleanups = new Set()
-  // Accepted activations belong to DSH, not to the tool registration. Keep their
-  // captured deadlines until settlement across reload. Caller cancellation owns
-  // startup only; accepted background work belongs to the Subagent Manager.
-  // Disposing this component only withdraws tools; it does not cancel child work.
   const tasks = ctx.multiAgentTasks
+  const dispatchTask = createDispatcher()
   registerAgentTasksTool(ctx, tasks)
-  registerTaskContinuation(ctx, { tasks, resolveTaskLanguage, getSettings: () => currentRouterConfig(config) })
+  registerTaskContinuation(ctx, {
+    tasks, resolveTaskLanguage, getSettings: () => currentRouterConfig(config),
+    dispatchSelected: dispatchTask, dispatchOutput: output,
+  })
 
   const definition = {
     name: 'dispatch_agent',
@@ -166,7 +141,17 @@ export function apply(ctx, config) {
     },
     output,
     isConcurrencySafe: () => true,
-    async execute(args, exec) {
+    execute: (args, exec) => dispatchTask(args, exec),
+  }
+
+  function createDispatcher() {
+    const resolveDshModel = createDshModelResolver(ctx)
+    const cleanups = new Set()
+    // Accepted activations belong to DSH, not to the tool registration. Keep their
+    // captured deadlines until settlement across reload. Caller cancellation owns
+    // startup only; accepted background work belongs to the Subagent Manager.
+    // Disposing this component only withdraws tools; it does not cancel child work.
+    return async (args, exec, confirmedSelection) => {
       if (!exec.agent) throw new Error('dispatch_agent requires a calling agent')
       if (!isRootAgent(ctx, exec.agent)) throw new Error('dispatch_agent is available only from a root/main agent; nested agents must return their result to the parent instead of delegating again')
       for (const field of ['description', 'task', 'expected_output']) {
@@ -176,7 +161,7 @@ export function apply(ctx, config) {
       await tasks.ready
       tasks.assertStorageAvailable()
       const settings = currentRouterConfig(config)
-      let selection = await chooseAgent(ctx, settings, args, exec)
+      let selection = confirmedSelection ?? await chooseAgent(ctx, settings, args, exec)
       if (!selection) return { kind: 'cancelled', reason: 'the user skipped agent selection' }
       let provider = ctx.subagents.getProvider(selection.agent.providerName)
       if (!provider && selection.agent.id !== 'dsh') {
@@ -294,7 +279,7 @@ export function apply(ctx, config) {
         ...(agentOptions?.model === undefined ? {} : { model: agentOptions.model }),
         ...(agentOptions?.reasoningEffort === undefined ? {} : { reasoningEffort: agentOptions.reasoningEffort }),
       }
-    },
+    }
   }
   ctx.effect(() => ctx.tools.register(definition, {
     when: ({ agent }) => isRootAgent(ctx, agent),

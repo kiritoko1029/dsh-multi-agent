@@ -284,9 +284,10 @@ test('client-bundle synchronizes themes instantly across settings modal, task pa
     assert.equal(trees.completion.props['data-ma-theme'], 'midnight')
     if (!storageBroken) assert.equal(storeMap.get(THEME_STORAGE_KEY), 'midnight')
 
-    // Switch via sidebar radio button
+    // The header select is the only appearance control; no duplicate sidebar radio remains.
     const paperRadio = findNodes(trees.overlay, (n) => n.type === 'button' && n.props.name === 'theme-choice-paper')[0]
-    paperRadio.props.onClick()
+    assert.equal(paperRadio, undefined)
+    select.props.onChange({ target: { value: 'paper' } })
     trees = app.renderAll()
     assert.equal(trees.overlay.props['data-ma-theme'], 'paper')
     assert.equal(trees.tasks.props['data-ma-theme'], 'paper')

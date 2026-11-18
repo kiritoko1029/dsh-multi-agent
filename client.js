@@ -353,7 +353,7 @@ window.__ModuleLoader__.load({
     const HEADER_CSS = `
 .ma-header-utility{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;min-width:0}
 .ma-header-utility *{box-sizing:border-box}
-.ma-header-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:28px;height:28px;min-width:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;font-weight:550;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:color 180ms ease,transform 180ms ease}
+.ma-header-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:28px;height:28px;min-width:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;font-weight:550;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:color 180ms ease,transform 180ms ease}
 .ma-header-btn:hover:not(:disabled){color:var(--dsw-alias-label-primary)}
 .ma-header-btn:active:not(:disabled){transform:translateY(1px)}
 .ma-header-btn[aria-expanded="true"]{color:var(--dsw-alias-brand-primary)}
@@ -367,6 +367,10 @@ window.__ModuleLoader__.load({
 .ma-header-error{color:var(--dsw-alias-state-error-primary)}
 .ma-header-spinner{animation:ma-header-spin 1s linear infinite;transform-origin:center}
 .ma-header-live{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ma-header-tooltip{position:absolute;top:calc(100% + 6px);right:0;z-index:1000;padding:5px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-overlay);box-shadow:0 4px 12px color-mix(in srgb,var(--dsw-alias-label-primary) 18%,transparent);color:var(--dsw-alias-label-primary);font-size:12px;font-weight:500;line-height:1.4;white-space:nowrap;pointer-events:none;opacity:0;visibility:hidden;transform:translateY(-2px);transition:opacity 150ms ease,transform 150ms ease,visibility 150ms ease}
+.ma-header-tooltip::before{content:'';position:absolute;top:-7px;right:0;left:0;height:7px}
+.ma-header-btn:hover:not(:disabled) .ma-header-tooltip,.ma-header-btn:focus-visible:not(:disabled) .ma-header-tooltip{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+.ma-header-btn[data-tooltip-dismissed='true'] .ma-header-tooltip{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 @keyframes ma-header-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.ma-header-utility *{transition:none!important;animation:none!important;transform:none!important}}
 `
@@ -409,9 +413,9 @@ window.__ModuleLoader__.load({
 .ma-theme-picker-label{color:var(--ma-muted)}
 .ma-theme-picker select{height:28px;min-width:0;padding:0 6px;border:0;border-radius:6px;background:transparent;color:var(--ma-text);font:inherit;font-size:12px;font-weight:550;cursor:pointer;outline:none}
 .ma-theme-picker select option{background:var(--ma-surface);color:var(--ma-text)}
-.ma-modal-close{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:32px;height:32px;padding:0;border:1px solid var(--ma-line-strong);border-radius:9px;background:var(--ma-bg);color:var(--ma-text);cursor:pointer;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease}
+.ma-modal-close{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:36px;height:36px;padding:0;border:1px solid var(--ma-line-strong);border-radius:9px;background:var(--ma-bg);color:var(--ma-text);cursor:pointer;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease}
 .ma-modal-close:hover:not(:disabled){border-color:var(--ma-accent);background:var(--ma-hover)}
-.ma-modal-close svg{width:16px;height:16px}
+.ma-modal-close svg{width:20px;height:20px}
 .ma-unsaved-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;flex:0 0 auto;padding:11px 24px;border-bottom:1px solid var(--ma-warn);background:var(--ma-warn-soft);font-size:13px;line-height:1.45}
 .ma-unsaved-copy{color:var(--ma-text);font-weight:550}
 .ma-unsaved-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -428,19 +432,6 @@ window.__ModuleLoader__.load({
 .ma-nav-btn[aria-pressed="true"]{border-color:color-mix(in srgb,var(--ma-accent) 28%,transparent);background:var(--ma-accent-soft);color:var(--ma-accent);font-weight:600}
 .ma-nav-btn[aria-pressed="true"] .ma-nav-icon{color:var(--ma-accent)}
 .ma-dirty-dot{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--ma-warn)}
-.ma-appearance-panel{display:grid;gap:8px;padding:11px;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-bg)}
-.ma-appearance-head{display:grid;gap:2px}
-.ma-appearance-title{margin:0;font-size:11px;font-weight:650;color:var(--ma-text);letter-spacing:.03em;text-transform:uppercase}
-.ma-appearance-hint{margin:0;font-size:11px;line-height:1.35;color:var(--ma-muted)}
-.ma-theme-grid{display:grid;gap:4px}
-.ma-modal button.ma-theme-choice{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:30px;padding:5px 9px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ma-text);font-size:12px;font-weight:500;text-align:left}
-.ma-modal button.ma-theme-choice:hover:not(:disabled){background:var(--ma-hover);border-color:var(--ma-line)}
-.ma-modal button.ma-theme-choice[aria-checked="true"]{background:var(--ma-accent-soft);border-color:color-mix(in srgb,var(--ma-accent) 32%,transparent);color:var(--ma-accent);font-weight:600}
-.ma-theme-choice-main{display:inline-flex;align-items:center;gap:7px;min-width:0;overflow:hidden}
-.ma-theme-choice-main span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ma-theme-choice-icon{width:13px;height:13px;flex:0 0 auto;color:var(--ma-muted)}
-.ma-modal button.ma-theme-choice[aria-checked="true"] .ma-theme-choice-icon{color:var(--ma-accent)}
-.ma-theme-check{width:13px;height:13px;flex:0 0 auto;color:var(--ma-accent)}
 .ma-provider-list{display:grid;gap:8px;margin-top:auto;padding:11px;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-bg)}
 .ma-provider-list-title{margin:0;font-size:11px;font-weight:650;color:var(--ma-muted);letter-spacing:.03em;text-transform:uppercase}
 .ma-provider-item{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ma-muted)}
@@ -497,7 +488,7 @@ window.__ModuleLoader__.load({
 .ma-footer-status p.ma-error{background:var(--ma-error-soft)}
 .ma-footer-status p.ma-success{background:var(--ma-success-soft)}
 .ma-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
-@media(max-width:920px){.ma-model-grid,.ma-two-col{grid-template-columns:1fr}.ma-modal-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ma-modal-nav{flex-direction:row;align-items:center;overflow-x:auto;padding:10px 16px;border-right:0;border-bottom:1px solid var(--ma-line)}.ma-nav-list{display:flex;flex:1 0 auto;gap:6px}.ma-nav-btn{width:auto;white-space:nowrap;padding:7px 11px}.ma-appearance-panel,.ma-provider-list{display:none}}
+@media(max-width:920px){.ma-model-grid,.ma-two-col{grid-template-columns:1fr}.ma-modal-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ma-modal-nav{flex-direction:row;align-items:center;overflow-x:auto;padding:10px 16px;border-right:0;border-bottom:1px solid var(--ma-line)}.ma-nav-list{display:flex;flex:1 0 auto;gap:6px}.ma-nav-btn{width:auto;white-space:nowrap;padding:7px 11px}.ma-provider-list{display:none}}
 @media(max-width:680px){.ma-overlay-backdrop{padding:8px}.ma-modal{width:calc(100vw - 16px);height:calc(100vh - 16px);max-height:calc(100vh - 16px);border-radius:12px}.ma-modal-header{flex-wrap:wrap;padding:14px 16px 12px}.ma-modal-tools{width:100%;justify-content:space-between}.ma-theme-picker{flex:1 1 auto;min-width:0}.ma-theme-picker select{flex:1 1 auto;width:100%}.ma-modal-scroll{padding:14px 16px 18px}.ma-section{padding:15px 16px}.ma-modal-footer{padding:10px 16px}.ma-route{grid-template-columns:1fr}.ma-route .ma-remove{justify-self:start}}
 @media(max-width:480px){.ma-theme-picker-label{display:none}.ma-card-fields,.ma-fields{grid-template-columns:minmax(0,1fr)}.ma-actions{width:100%}.ma-actions button{flex:1 1 auto}}
 @media(prefers-reduced-motion:reduce){.ma-overlay-backdrop *,.ma-modal *{transition:none!important;animation:none!important;transform:none!important}}
@@ -619,7 +610,7 @@ window.__ModuleLoader__.load({
     }
 
     function CloseIcon() {
-      return h(SvgIcon, { strokeWidth: 1.8, paths: ['M6 6l12 12', 'M18 6L6 18'] })
+      return h(SvgIcon, { className: 'ma-modal-close-icon', strokeWidth: 2.2, paths: ['M6 6l12 12', 'M18 6L6 18'] })
     }
 
     function NavIcon({ id }) {
@@ -911,29 +902,46 @@ window.__ModuleLoader__.load({
           ? t('header.running', { count: running })
           : errors > 0 ? t('header.errors', { count: errors }) : ''
       const statusChildId = indicator.latestActiveChildId || indicator.latestErrorChildId
+      const [tooltipDismissed, setTooltipDismissed] = useState(false)
+      const tooltipInteraction = {
+        'data-tooltip-dismissed': tooltipDismissed ? 'true' : undefined,
+        onPointerEnter: () => setTooltipDismissed(false),
+        onBlur: () => setTooltipDismissed(false),
+        onKeyDown: (event) => {
+          if (event.key !== 'Escape' || tooltipDismissed) return
+          setTooltipDismissed(true)
+          event.stopPropagation()
+        },
+      }
+      const stopTooltipClick = (event) => event.stopPropagation()
       const settingsButton = h('button', {
         ref: buttonRef,
+        ...tooltipInteraction,
         type: 'button',
         name: face.name,
         className: face.buttonClass,
-        title: t('header.tooltip'),
+        title: variant === 'hero' ? t('header.tooltip') : undefined,
         'aria-label': label,
+        'aria-describedby': variant === 'header' ? `${face.name}-tooltip` : undefined,
         'aria-haspopup': 'dialog',
         'aria-expanded': open,
         onClick: () => store.open(buttonRef.current),
       },
       h(HeaderIcon),
-      variant === 'hero' ? h('span', { className: face.labelClass }, label) : null)
+      variant === 'hero' ? h('span', { className: face.labelClass }, label) : null,
+      variant === 'header' ? h('span', { id: `${face.name}-tooltip`, className: 'ma-header-tooltip', role: 'tooltip', onClick: stopTooltipClick }, label) : null)
       const statusButton = statusLabel ? h('button', {
         type: 'button',
         name: 'multi-agent-task-status-trigger',
         className: 'ma-header-btn ma-header-status',
-        title: statusLabel,
+        ...tooltipInteraction,
         'aria-label': statusLabel,
+        'aria-describedby': 'multi-agent-task-status-tooltip',
         onClick: () => shared.openTasks?.(sessionId, statusChildId),
       },
       running > 0 ? h('span', { className: 'ma-header-running' }, h(RunningIcon), h('span', null, running)) : null,
-      errors > 0 ? h('span', { className: 'ma-header-error' }, h(ErrorIcon), h('span', null, errors)) : null) : null
+      errors > 0 ? h('span', { className: 'ma-header-error' }, h(ErrorIcon), h('span', null, errors)) : null,
+      h('span', { id: 'multi-agent-task-status-tooltip', className: 'ma-header-tooltip', role: 'tooltip', onClick: stopTooltipClick }, statusLabel)) : null
       return h('span', { className: face.rootClass },
         h('style', null, face.css),
         settingsButton,
@@ -956,7 +964,6 @@ window.__ModuleLoader__.load({
       const saving = useRef(false)
       const mounted = useRef(false)
       const continueButtonRef = useRef(null)
-      const themeRadioRefs = useRef(new Map())
       const wasConfirmClose = useRef(false)
       const catalogGeneration = useRef({ dsh: 0, codex: 0, acp: 0, agy: 0 })
       const [catalogs, setCatalogs] = useState(() => Object.fromEntries(['dsh', 'codex', 'acp', 'agy'].map((key) => [key, { status: 'loading', groups: [], failures: [] }])))
@@ -1239,20 +1246,6 @@ window.__ModuleLoader__.load({
       const showModels = activeSection === 'all' || activeSection === 'models'
       const showPolicy = activeSection === 'all' || activeSection === 'policy'
       const showRuntime = activeSection === 'all' || activeSection === 'runtime'
-      const activeThemeId = THEME_IDS.includes(theme) ? theme : THEME_IDS[0]
-      const onThemeRadioKeyDown = (event, index) => {
-        if (event.defaultPrevented || event.isComposing) return
-        let nextIndex
-        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % THEME_IDS.length
-        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + THEME_IDS.length) % THEME_IDS.length
-        else if (event.key === 'Home') nextIndex = 0
-        else if (event.key === 'End') nextIndex = THEME_IDS.length - 1
-        else return
-        event.preventDefault?.()
-        const nextId = THEME_IDS[nextIndex]
-        writeTheme(nextId)
-        themeRadioRefs.current.get(nextId)?.focus?.({ preventScroll: true })
-      }
       const isAlertResult = result === 'common.failure' || result === 'common.conflict' || result.startsWith('common.invalid') || result === 'common.commandRequired' || result === 'agy.commandRequired' || result === 'common.routesRequired' || conflict
 
       return h('form', { className: 'ma-modal-form', onSubmit: save, 'aria-label': t('unified.title') },
@@ -1294,27 +1287,6 @@ window.__ModuleLoader__.load({
                 h(NavIcon, { id: section.id }),
                 h('span', null, section.label)),
               section.dirty ? h('span', { className: 'ma-dirty-dot', 'aria-hidden': true }) : null))),
-            h('div', { className: 'ma-appearance-panel' },
-              h('div', { className: 'ma-appearance-head' },
-                h('p', { className: 'ma-appearance-title' }, t('theme.label')),
-                h('p', { className: 'ma-appearance-hint' }, t('theme.hint'))),
-              h('div', { className: 'ma-theme-grid', role: 'radiogroup', 'aria-label': t('theme.label') },
-                THEME_IDS.map((id, index) => h('button', {
-                  key: id,
-                  ref: (node) => { if (node) themeRadioRefs.current.set(id, node); else themeRadioRefs.current.delete(id) },
-                  type: 'button',
-                  name: `theme-choice-${id}`,
-                  role: 'radio',
-                  'aria-checked': theme === id,
-                  tabIndex: id === activeThemeId ? 0 : -1,
-                  className: 'ma-theme-choice',
-                  onClick: () => writeTheme(id),
-                  onKeyDown: (event) => onThemeRadioKeyDown(event, index),
-                },
-                h('span', { className: 'ma-theme-choice-main' },
-                  h(ThemeIcon, { id }),
-                  h('span', null, t(`theme.${id}`))),
-                theme === id ? h(SvgIcon, { className: 'ma-theme-check', strokeWidth: 2, paths: ['M5 12.5l4.2 4.2L19 7'] }) : null)))),
             h('div', { className: 'ma-provider-list' },
               h('p', { className: 'ma-provider-list-title' }, t('modal.statusHeading')),
               providerStatuses.map((item) => {

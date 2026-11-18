@@ -2,9 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
+import { Readable } from 'node:stream'
 import { apply } from '../index.js'
 import { DEFAULT_REPORT_DIRECTORY } from '../lib/reports.js'
-import { MultiAgentTasks } from '../task-monitor.js'
+import { currentTaskTrace, MultiAgentTasks } from '../task-monitor.js'
 
 const WORKSPACE = resolve(tmpdir(), 'dsh-router-workspace')
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -27,7 +28,7 @@ function makeConfig(overrides = {}) {
 }
 
 function harness(config = makeConfig(), activationOverrides = {}, answer, modern = false) {
-  const state = { starts: [], questions: [], activations: [], effects: [] }
+  const state = { starts: [], startTraces: [], questions: [], activations: [], effects: [] }
   const rootAgent = { id: 'parent-session', options: { provider: 'parent-provider', model: 'parent-model' }, session: { id: 'parent-session', header: { origin: 'user' }, requestHeader: () => undefined } }
   state.roots = [rootAgent]
   const ctx = {
@@ -57,7 +58,7 @@ function harness(config = makeConfig(), activationOverrides = {}, answer, modern
       },
       get(name) { return state.definition?.name === name ? state.definition : undefined },
     },
-    webServer: { register(route) { state.taskRoute = route; return () => {} } },
+    webServer: { getOrigin: () => 'http://localhost', register(route) { state.taskRoute = route; return () => {} } },
     connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
     reflect: { provide(name, value) { state[name] = value; ctx[name] = value } },
     get(name) { return state[name] },
@@ -74,6 +75,7 @@ function harness(config = makeConfig(), activationOverrides = {}, answer, modern
       },
       async startActivation(spec) {
         state.starts.push(spec)
+        state.startTraces.push(currentTaskTrace())
         const activation = {
           childId: `child-${state.starts.length}`,
           result: Promise.resolve({ output: [], stopReason: 'completed' }),
@@ -300,6 +302,157 @@ test('always-ask recommends the model choice but the user can override it', asyn
   assert.equal(value.route, 'user')
   assert.equal(value.agent, 'kimi-code')
   assert.match(state.questions[0].questions[0].options[0].label, /Recommended/)
+})
+
+function followUpHarness({ selectionMode = 'always-ask', choose, source = {} } = {}) {
+  const { ctx, state, exec } = harness(makeConfig({ selectionMode }), {}, choose)
+  const tasks = state.multiAgentTasks
+  const trace = tasks.begin({ parentSessionId: exec.agent.id, agent: 'codex', providerName: 'codex',
+    label: '修复解析器', language: 'zh-CN', cwd: join(WORKSPACE, 'repo'), reportPath: join(WORKSPACE, 'original.md') })
+  tasks.bind(trace, 'original-child')
+  tasks.settle(trace, { stopReason: 'completed', output: '原结果' })
+  Object.assign(trace.record, { continuation: { agent: 'codex', sessionId: 'saved-thread' } }, source)
+  const args = { childId: 'original-child', message: '补充边界测试' }
+  const fromTool = () => state.continueDefinition.execute(args, exec)
+  const fromPanel = async () => {
+    const req = Readable.from([JSON.stringify({ action: 'continue', parentSessionId: exec.agent.id, ...args })])
+    req.method = 'POST'; req.headers = { origin: 'http://localhost', 'content-type': 'application/json' }
+    const res = { writeHead(status) { this.status = status }, end(body) { this.body = JSON.parse(body) } }
+    await state.taskRoute.handler(req, res)
+    return res
+  }
+  return { ctx, state, tasks, fromTool, fromPanel, exec, trace }
+}
+
+function followUpAnswer(agentIndex, sessionIndex) {
+  return ({ questions: [agent, session] }) => ({ answers: [
+    { id: agent.id, selected: agentIndex === undefined ? [] : [agent.options[agentIndex].label] },
+    { id: session.id, selected: sessionIndex === undefined ? [] : [session.options[sessionIndex].label] },
+  ] })
+}
+
+test('always-ask 每次续接在同一请求两问，复用保留旧身份、报告和外部会话', async () => {
+  const { state, fromTool, fromPanel, exec, trace } = followUpHarness({ choose: followUpAnswer(0, 0) })
+  const first = await fromTool()
+  const second = await fromPanel()
+  assert.equal(second.status, 200)
+  for (const value of [first, second.body.value]) {
+    assert.equal(value.kind, 'continuation')
+    assert.equal(value.childId, 'original-child')
+    assert.equal(value.reusedSession, true)
+    assert.equal(value.reportPath, trace.record.reportPath)
+  }
+  assert.equal(state.questions.length, 2)
+  for (const request of state.questions) {
+    assert.equal(request.agent, exec.agent)
+    assert.deepEqual(request.questions.map(({ id }) => id), ['dispatch-agent', 'continue-session'])
+    assert.match(request.questions[0].options[0].label, /Codex.*Recommended/)
+    assert.match(request.questions[1].options[0].label, /复用旧会话.*推荐/)
+  }
+  assert.equal(state.questions[0].wait.callId, exec.callId)
+  assert.equal(state.questions[1].wait, undefined)
+  assert.equal(trace.record.continuationCount, 2)
+  assert.equal(state.starts.length, 2)
+  assert.ok(state.startTraces.every((start) => start.record === trace.record && start.resume.sessionId === 'saved-thread'))
+})
+
+test('always-ask 确认复用原生 DSH 会话后只发送 follow-up 消息', async () => {
+  const { ctx, state, tasks, fromTool, exec, trace } = followUpHarness({
+    source: { agent: 'dsh', providerName: 'spawn', continuation: undefined }, choose: followUpAnswer(3, 0),
+  })
+  let sends = 0
+  ctx.subagents.sendMessage = async (parent, target) => {
+    assert.equal(parent, exec.agent)
+    assert.equal(target, trace.record.childId)
+    sends++
+    return 'follow-up'
+  }
+  const result = await fromTool()
+  assert.equal(result.kind, 'continuation')
+  assert.equal(result.messageId, 'follow-up')
+  assert.equal(sends, 1)
+  assert.equal(state.starts.length, 0)
+  assert.equal(state.questions.length, 1)
+  tasks.settle(trace.record.trace, { stopReason: 'completed' })
+})
+
+test('面板选择新会话走独立派发，无 resume、不覆写旧报告、不再次询问', async () => {
+  const { state, tasks, fromPanel, exec, trace } = followUpHarness({ choose: followUpAnswer(1, 1) })
+  const before = tasks.detail(exec.agent.id, 'original-child')
+  const response = await fromPanel()
+  assert.equal(response.status, 200)
+  const value = response.body.value
+  assert.equal(value.kind, 'activation')
+  assert.equal(value.route, 'user')
+  assert.equal(value.agent, 'kimi-code')
+  assert.notEqual(value.subagentId, before.childId)
+  assert.notEqual(value.reportPath, before.reportPath)
+  assert.equal(state.startTraces[0].resume, undefined)
+  assert.notEqual(state.startTraces[0].record, trace.record)
+  assert.equal(state.starts[0].request.cwd, before.cwd)
+  assert.match(state.starts[0].request.prompt[0].text, /补充边界测试/)
+  assert.match(state.starts[0].request.prompt[0].text, /Use "zh-CN"/)
+  assert.deepEqual(tasks.detail(exec.agent.id, 'original-child'), before)
+  assert.equal(tasks.list(exec.agent.id).tasks.length, 2)
+  assert.equal(state.starts.length, 1)
+  assert.equal(state.questions.length, 1)
+})
+
+test('跳过任一问题或中止回答均不启动、不修改旧记录', async () => {
+  for (const choose of [followUpAnswer(undefined, 0), followUpAnswer(0, undefined)]) {
+    const { state, fromTool, fromPanel, trace } = followUpHarness({ choose })
+    assert.equal((await fromTool()).kind, 'cancelled')
+    const response = await fromPanel()
+    assert.equal(response.body.ok, false)
+    assert.match(response.body.error.message, /未启动/)
+    assert.equal(state.starts.length, 0)
+    assert.equal(trace.record.trace, trace)
+  }
+  const controller = new AbortController()
+  const { state, exec, trace, fromTool } = followUpHarness({ choose(request) {
+    controller.abort(new Error('cancelled by caller'))
+    return followUpAnswer(0, 1)(request)
+  } })
+  exec.signal = controller.signal
+  await assert.rejects(fromTool(), /cancelled by caller/)
+  assert.equal(state.starts.length, 0)
+  assert.equal(trace.record.trace, trace)
+})
+
+test('换 Agent 不能复用；Provider 或外部会话不兼容时仅允许新建', async () => {
+  const mismatch = followUpHarness({ choose: followUpAnswer(1, 0) })
+  await assert.rejects(mismatch.fromTool(), /请选择新建会话/)
+  assert.equal(mismatch.state.starts.length, 0)
+  assert.equal(mismatch.trace.record.continuationCount, 0)
+  for (const source of [{ providerName: 'retired' }, { continuation: undefined }, { continuation: { agent: 'agy', sessionId: 'wrong' } }]) {
+    const { state, fromTool, trace } = followUpHarness({ source, choose: followUpAnswer(0, 0) })
+    assert.equal((await fromTool()).kind, 'activation')
+    assert.deepEqual(state.questions[0].questions[1].options.map(({ label }) => label), ['新建会话'])
+    assert.equal(state.startTraces[0].resume, undefined)
+    assert.equal(trace.record.trace, trace)
+  }
+})
+
+test('auto 与 ask-if-ambiguous 继续直接复用原会话，不发起询问', async () => {
+  for (const selectionMode of ['auto', 'ask-if-ambiguous']) {
+    const { state, fromTool } = followUpHarness({ selectionMode })
+    const value = await fromTool()
+    assert.equal(value.kind, 'continuation')
+    assert.equal(value.reusedSession, true)
+    assert.equal(state.startTraces[0].resume.sessionId, 'saved-thread')
+    assert.equal(state.questions.length, 0)
+  }
+})
+
+test('询问期间原任务发生新的续接时不使用过期回答', async () => {
+  const { fromTool, state, tasks, exec } = followUpHarness({ choose(request) {
+    const next = tasks.beginContinuation(exec.agent.id, 'original-child')
+    next.accept()
+    tasks.settle(next.trace, { stopReason: 'completed' })
+    return followUpAnswer(0, 0)(request)
+  } })
+  await assert.rejects(fromTool(), /changed while awaiting your selection; retry/)
+  assert.equal(state.starts.length, 0)
 })
 
 test('recommendation suffix collisions fail instead of selecting the wrong agent', async () => {

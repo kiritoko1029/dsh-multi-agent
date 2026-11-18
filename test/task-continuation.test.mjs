@@ -99,6 +99,7 @@ function harness(options = {}) {
   }
   registerTaskContinuation(ctx, {
     tasks,
+    dispatchOutput: { schema: { oneOf: [] } },
     getSettings: () => state.settings,
     resolveTaskLanguage: async (args) => args.language ? { language: args.language } : { parentLanguageSample: '请继续' },
   })
@@ -177,7 +178,7 @@ test('agy 续接保留 agy provider、会话引用与输出 schema', async () =>
   assert.equal(state.starts[0].provider, 'agy')
   assert.equal(state.traceProbe.agent, 'agy')
   assert.equal(state.traceProbe.sessionId, 'saved-agy')
-  assert.ok(state.definition.output.schema.properties.agent.enum.includes('agy'))
+  assert.ok(state.definition.output.schema.oneOf[0].properties.agent.enum.includes('agy'))
 })
 
 test('启动失败 rollback 且不透传 provider 协议细节', async () => {
