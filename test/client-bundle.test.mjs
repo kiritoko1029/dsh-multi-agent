@@ -25,6 +25,7 @@ function stageBuildRoot(t) {
   cpSync(join(root, 'client.js'), join(tempRoot, 'client.js'))
   cpSync(join(root, 'tasks-client.js'), join(tempRoot, 'tasks-client.js'))
   cpSync(join(root, 'lib', 'ui-theme.js'), join(tempRoot, 'lib', 'ui-theme.js'))
+  cpSync(join(root, 'lib', 'task-indicator-store.js'), join(tempRoot, 'lib', 'task-indicator-store.js'))
   cpSync(join(root, 'scripts', 'build-client.mjs'), join(tempRoot, 'scripts', 'build-client.mjs'))
   try {
     symlinkSync(join(root, 'node_modules'), join(tempRoot, 'node_modules'), 'junction')

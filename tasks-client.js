@@ -1,9 +1,10 @@
 window.__ModuleLoader__.load({
   id: 'dsh-multi-agent/tasks-ui',
-  factory(require) {
+  factory(require, shared = {}) {
     const React = require('react')
     const MarkdownIt = require('markdown-it')
     const uiTheme = require('dsh-multi-agent/ui-theme')
+    const createTaskIndicatorStore = require('dsh-multi-agent/task-indicator-store')
     const h = React.createElement
     const { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } = React
     const { THEME_CSS, createUseTheme } = uiTheme
@@ -16,6 +17,15 @@ window.__ModuleLoader__.load({
     const TAB_IMPLEMENTATION_ID = 'dsh-multi-agent/tasks'
     const NODE_KIND = 'multi-agent-dispatch-settled'
     const ACTIVE_STATUSES = ['starting', 'running']
+    const taskStoreListeners = new Set()
+    shared.subscribeTaskStore = (listener) => {
+      taskStoreListeners.add(listener)
+      return () => taskStoreListeners.delete(listener)
+    }
+    const publishTaskStore = (taskStore) => {
+      shared.taskStore = taskStore || undefined
+      for (const listener of [...taskStoreListeners]) listener(shared.taskStore)
+    }
     const STATUS_VALUES = ['starting', 'running', 'completed', 'aborted', 'error', 'max-tokens', 'refusal', 'interrupted']
     const DICT = {
       en: {
@@ -488,59 +498,55 @@ window.__ModuleLoader__.load({
       return { ...known, manage }
     }
 
-    function useTaskList(parentSessionId, visible, refresh) {
-      const generation = useRef(0)
-      const [state, setState] = useState(() => ({ parentSessionId, status: 'loading', tasks: [], revision: 0, error: false, loadSeq: 0 }))
+    function normalizeTaskList(value, parentSessionId) {
+      if (!Array.isArray(value.tasks)) throw new Error('invalid-task-list')
+      return value.tasks.map((task) => normalizeTask(task, parentSessionId)).filter(Boolean)
+        .sort((left, right) => {
+          if (left.startedAt === undefined) return right.startedAt === undefined ? 0 : 1
+          if (right.startedAt === undefined) return -1
+          return right.startedAt - left.startedAt
+        })
+    }
+
+    function pageVisibilitySnapshot() {
+      return typeof document === 'undefined' || document.visibilityState !== 'hidden'
+    }
+
+    function usePageVisibility() {
+      const [visible, setVisible] = useState(pageVisibilitySnapshot)
       useEffect(() => {
-        const current = ++generation.current
+        if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return undefined
+        const update = () => setVisible(pageVisibilitySnapshot())
+        document.addEventListener('visibilitychange', update)
+        update()
+        return () => document.removeEventListener('visibilitychange', update)
+      }, [])
+      return visible
+    }
+
+    function useTaskList(parentSessionId, visible, refresh, taskStore) {
+      const pageVisible = usePageVisibility()
+      const [state, setState] = useState(() => taskStore.getSnapshot(parentSessionId))
+      useEffect(() => {
+        const update = () => setState(taskStore.getSnapshot(parentSessionId))
+        const unsubscribe = taskStore.subscribe(parentSessionId, update)
+        update()
+        return unsubscribe
+      }, [parentSessionId, taskStore])
+      useEffect(() => {
         if (!visible || !parentSessionId) return undefined
-        const controller = new AbortController()
-        let active = true
-        let timer
-        const load = async () => {
-          setState((previous) => ({
-            parentSessionId,
-            status: previous.tasks.length > 0 && previous.parentSessionId === parentSessionId ? 'ready' : 'loading',
-            tasks: previous.parentSessionId === parentSessionId ? previous.tasks : [],
-            revision: previous.parentSessionId === parentSessionId ? previous.revision : 0,
-            error: false,
-            loadSeq: previous.parentSessionId === parentSessionId ? previous.loadSeq : 0,
-          }))
-          try {
-            const value = await requestTasks(parentSessionId, undefined, controller.signal)
-            if (!active || current !== generation.current) return
-            if (!Array.isArray(value.tasks)) throw new Error('invalid-task-list')
-            const tasks = value.tasks.map((task) => normalizeTask(task, parentSessionId)).filter(Boolean)
-              .sort((left, right) => {
-                if (left.startedAt === undefined) return right.startedAt === undefined ? 0 : 1
-                if (right.startedAt === undefined) return -1
-                return right.startedAt - left.startedAt
-              })
-            setState((previous) => ({
-              parentSessionId,
-              status: 'ready',
-              tasks,
-              revision: Number.isFinite(value.revision) ? value.revision : 0,
-              error: false,
-              loadSeq: (previous.parentSessionId === parentSessionId ? previous.loadSeq : 0) + 1,
-            }))
-          } catch {
-            if (!active || current !== generation.current || controller.signal.aborted) return
-            setState((previous) => ({ ...previous, parentSessionId, status: previous.tasks.length > 0 ? 'ready' : 'error', error: true }))
-          }
-          if (active && current === generation.current) timer = setTimeout(load, 1500)
+        return taskStore.watch(parentSessionId, { panelVisible: true })
+      }, [parentSessionId, visible, taskStore])
+      useEffect(() => {
+        if (refresh > 0 && visible && parentSessionId) taskStore.refresh(parentSessionId)
+      }, [parentSessionId, visible, refresh, taskStore])
+      const snapshot = state.parentSessionId === parentSessionId ? state : taskStore.getSnapshot(parentSessionId)
+      useEffect(() => {
+        if (visible && pageVisible && pageVisibilitySnapshot() && parentSessionId && snapshot.unreadErrorCount > 0) {
+          taskStore.markErrorsRead(parentSessionId)
         }
-        void load()
-        return () => {
-          active = false
-          generation.current += 1
-          clearTimeout(timer)
-          controller.abort()
-        }
-      }, [parentSessionId, visible, refresh])
-      return state.parentSessionId === parentSessionId
-        ? state
-        : { parentSessionId, status: 'loading', tasks: [], revision: 0, error: false, loadSeq: 0 }
+      }, [parentSessionId, visible, pageVisible, snapshot.unreadErrorCount, taskStore])
+      return snapshot
     }
 
     function useTaskDetail(summary, parentSessionId, visible, expanded, refresh) {
@@ -1220,7 +1226,7 @@ window.__ModuleLoader__.load({
             }, t('tasks.clear')) : null))))))
     }
 
-    function TasksPanel({ scope, tab, visible, t, openFile }) {
+    function TasksPanel({ scope, tab, visible, t, openFile, taskStore }) {
       const parentSessionId = tab?.meta?.parentSessionId || scope?.sessionId
       const focusChildId = tab?.meta?.childId
       const cwd = scope?.cwd
@@ -1255,7 +1261,7 @@ window.__ModuleLoader__.load({
       }, [parentSessionId, historyOpen])
       const lastActiveSelection = useRef(new Map())
       const viewportStates = useRef(new Map())
-      const list = useTaskList(parentSessionId, visible === true, refresh)
+      const list = useTaskList(parentSessionId, visible === true, refresh, taskStore)
       listLoadSeqRef.current = list.loadSeq
       const manager = useTaskManager(parentSessionId, visible === true, () => setRefresh((value) => value + 1), t)
       const tasks = list.tasks
@@ -1457,6 +1463,7 @@ window.__ModuleLoader__.load({
         visible: tab.visible,
         t: props.t,
         openFile: props.openFile,
+        taskStore: props.taskStore,
       })
     }
 
@@ -1579,6 +1586,40 @@ window.__ModuleLoader__.load({
             params: { parentSessionId, ...(childId ? { childId } : {}), ...(cwd ? { cwd } : {}) },
           })
         }
+        const taskStore = createTaskIndicatorStore({
+          fetchTasks: async (parentSessionId, signal) => {
+            const value = await requestTasks(parentSessionId, undefined, signal)
+            return {
+              revision: Number.isFinite(value.revision) ? value.revision : 0,
+              tasks: normalizeTaskList(value, parentSessionId),
+            }
+          },
+          isVisible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+          setTimer: (callback, delay) => setTimeout(callback, delay),
+          clearTimer: (timer) => clearTimeout(timer),
+        })
+        publishTaskStore(taskStore)
+        shared.openTasks = (parentSessionId, childId) => openTasks(
+          parentSessionId,
+          ctx.sessions.list.getSnapshot()?.byId?.[parentSessionId]?.cwd,
+          childId,
+        )
+        ctx.effect(() => () => {
+          taskStore.dispose()
+          if (shared.taskStore === taskStore) {
+            publishTaskStore(undefined)
+            delete shared.openTasks
+          }
+        }, 'multi-agent tasks: shared indicator store')
+        ctx.effect(() => {
+          if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return undefined
+          const onVisibility = () => {
+            if (document.visibilityState === 'hidden') return
+            taskStore.wake(ctx.sidebarRight.mounted.getSnapshot())
+          }
+          document.addEventListener('visibilitychange', onVisibility)
+          return () => document.removeEventListener('visibilitychange', onVisibility)
+        }, 'multi-agent tasks: indicator visibility')
         ctx.effect(() => ctx.sidebarRightTabs.register({
           id: TAB_IMPLEMENTATION_ID,
           kind: TAB_ID,
@@ -1592,7 +1633,7 @@ window.__ModuleLoader__.load({
         }), 'multi-agent tasks: sidebar tab')
         ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
           name: 'sidebar.right.pane.tab', key: TAB_IMPLEMENTATION_ID, locale: NS,
-        }, (props) => h(TasksSidebarBody, { ...props, t, openFile }))), 'multi-agent tasks: sidebar body')
+        }, (props) => h(TasksSidebarBody, { ...props, t, openFile, taskStore }))), 'multi-agent tasks: sidebar body')
         ctx.effect(() => ctx.uiConversation.events.register(settlementDefinition()), 'multi-agent tasks: settlement definition')
         ctx.effect(() => ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
           name: 'conversation.chat.node', key: NODE_KIND, locale: NS,
@@ -1608,7 +1649,11 @@ window.__ModuleLoader__.load({
             baseline = next
             const parents = new Set(Object.keys(next?.projectionsBySession || {}))
             for (const parentSessionId of parents) {
-              if (!Object.hasOwn(previous?.projectionsBySession || {}, parentSessionId)) continue
+              const knownParent = Object.hasOwn(previous?.projectionsBySession || {}, parentSessionId)
+              if (!knownParent || next?.projectionsBySession?.[parentSessionId] !== previous?.projectionsBySession?.[parentSessionId]) {
+                taskStore.wake(parentSessionId)
+              }
+              if (!knownParent) continue
               const known = new Set(externalEntries(previous, parentSessionId).map((entry) => entry.id))
               const added = externalEntries(next, parentSessionId).filter((entry) => !known.has(entry.id))
               if (added.length > 0) openTasks(parentSessionId, next?.byId?.[parentSessionId]?.cwd, added[0].id)

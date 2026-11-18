@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import vm from 'node:vm'
 import { createUiTheme, THEME_CHANGE_EVENT, THEME_IDS, THEME_STORAGE_KEY } from '../lib/ui-theme.js'
+import { createTaskIndicatorStore } from '../lib/task-indicator-store.js'
 
 const require = createRequire(import.meta.url)
 const MarkdownIt = require('markdown-it')
@@ -217,6 +218,7 @@ function reactRuntime() {
           }
         }
         flush(pendingLayout)
+        options.beforeEffects?.()
         flush(pendingEffects)
         active = undefined
         return tree
@@ -294,20 +296,23 @@ function setup(options = {}) {
     CustomEvent,
   }
   const uiTheme = options.uiTheme || createUiTheme(win)
+  const shared = options.shared || {}
   win.__ModuleLoader__ = {
     load(registration) {
       moduleId = registration.id
       plugin = registration.factory((id) => {
         if (id === 'react') return runtime.React
         if (id === 'dsh-multi-agent/ui-theme') return uiTheme
+        if (id === 'dsh-multi-agent/task-indicator-store') return createTaskIndicatorStore
         assert.equal(id, 'markdown-it')
         return MarkdownIt
-      })
+      }, shared)
     },
   }
   const context = {
     window: win,
     CustomEvent,
+    ...(options.document ? { document: options.document } : {}),
     fetch: async (url, init) => {
       requests.push({ url, init })
       return fetchImpl(url, init)
@@ -364,7 +369,7 @@ function setup(options = {}) {
   const completion = slotRegistrations.find((registration) => registration.spec.name === 'conversation.chat.node')
   return {
     plugin, moduleId, requests, opened, files, tabRegistrations, slotRegistrations, slotInjections, eventDefinitions, dictionaries, clock, frames,
-    win, winListeners, storageMap, uiTheme,
+    win, winListeners, storageMap, uiTheme, shared,
     taskPanel, completion,
     renderer: runtime.renderer,
     setList(next) { listSnapshot = next; for (const listener of [...listeners]) listener() },
@@ -475,9 +480,121 @@ test('registers the native right-sidebar definition, body and settlement rendere
   assert.equal(app.eventDefinitions[0].kind, 'multi-agent-dispatch-settled')
   assert.equal(app.completion.spec.name, 'conversation.chat.node')
   assert.equal(app.completion.spec.key, 'multi-agent-dispatch-settled')
+  assert.equal(typeof app.shared.taskStore.getSnapshot, 'function')
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').runningCount, 0)
+  app.shared.openTasks('parent-1', 'child-1')
+  assert.deepEqual(app.opened[0], {
+    kind: 'multi-agent:tasks',
+    options: { params: { parentSessionId: 'parent-1', childId: 'child-1' } },
+  })
+  app.shared.openTasks('background-parent', 'child-2')
+  assert.equal(app.opened.length, 1, 'status clicks never open a background session over the current one')
   assert.equal(app.listenerCount, 1)
   app.dispose()
   assert.equal(app.listenerCount, 0)
+})
+
+test('only a foreground visible panel acknowledges errors, including in-flight responses', async () => {
+  const visibilityListeners = new Set()
+  const document = {
+    visibilityState: 'visible',
+    addEventListener(type, listener) { if (type === 'visibilitychange') visibilityListeners.add(listener) },
+    removeEventListener(type, listener) { visibilityListeners.delete(listener) },
+  }
+  const emitVisibility = () => { for (const listener of [...visibilityListeners]) listener() }
+  let task = { ...summary, status: 'error', updatedAt: 5000 }
+  let defer = true
+  const pending = []
+  const app = setup({
+    document,
+    fetch: async () => {
+      const response = () => jsonResponse({ ok: true, value: { revision: 1, tasks: [task] } })
+      if (!defer) return response()
+      defer = false
+      return new Promise((resolve) => pending.push(() => resolve(response())))
+    },
+  })
+  const props = { scope: { sessionId: 'parent-1' }, tab: { meta: {} }, visible: true }
+  const view = renderSidebarBody(app, props)
+  await view.settle()
+  assert.equal(pending.length, 1)
+
+  document.visibilityState = 'hidden'
+  emitVisibility()
+  await view.settle()
+  pending.shift()()
+  await view.settle()
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 1, 'an in-flight error stays unread while the page is hidden')
+
+  document.visibilityState = 'visible'
+  emitVisibility()
+  await view.settle()
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 0, 'returning to the visible panel acknowledges the error even without a count change')
+
+  task = { ...task, updatedAt: 6000 }
+  defer = true
+  const refreshing = app.shared.taskStore.refresh('parent-1')
+  assert.equal(pending.length, 1)
+  document.visibilityState = 'hidden'
+  emitVisibility()
+  await view.settle()
+  pending.shift()()
+  await refreshing
+  await view.settle()
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 1)
+
+  await view.settle({ ...props, visible: false })
+  document.visibilityState = 'visible'
+  emitVisibility()
+  await view.settle({ ...props, visible: false })
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 1, 'restoring the page cannot acknowledge a closed panel')
+  view.dispose()
+  app.dispose()
+  assert.equal(visibilityListeners.size, 0)
+})
+
+test('hidden between panel render and acknowledgement effect preserves unread errors', async () => {
+  const visibilityListeners = new Set()
+  const document = {
+    visibilityState: 'visible',
+    addEventListener(type, listener) { if (type === 'visibilitychange') visibilityListeners.add(listener) },
+    removeEventListener(type, listener) { visibilityListeners.delete(listener) },
+  }
+  const emitVisibility = () => { for (const listener of [...visibilityListeners]) listener() }
+  const task = { ...summary, status: 'error', updatedAt: 5000 }
+  const app = setup({
+    document,
+    fetch: async () => jsonResponse({ ok: true, value: { revision: 1, tasks: [task] } }),
+  })
+  const unwatch = app.shared.taskStore.watch('parent-1')
+  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => setImmediate(resolve))
+  unwatch()
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 1)
+
+  let intercepted = false
+  const view = renderSidebarBody(app, { scope: { sessionId: 'parent-1' }, tab: { meta: {} }, visible: true }, {
+    beforeEffects() {
+      if (intercepted) return
+      intercepted = true
+      // Model the browser hiding the page after render but before passive
+      // effects; no visibilitychange listener has been registered yet.
+      document.visibilityState = 'hidden'
+    },
+  })
+  view.render()
+  assert.ok(intercepted)
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 1, 'acknowledgement checks the live page state at effect execution time')
+
+  emitVisibility()
+  await view.settle()
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 1)
+  document.visibilityState = 'visible'
+  emitVisibility()
+  await view.settle()
+  assert.equal(app.shared.taskStore.getSnapshot('parent-1').unreadErrorCount, 0)
+  view.dispose()
+  app.dispose()
 })
 
 test('auto-opens only new external catalog entries in the owning on-screen parent session', () => {

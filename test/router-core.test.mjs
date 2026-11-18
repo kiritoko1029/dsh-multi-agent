@@ -30,6 +30,19 @@ test('routing guidance includes prompt rules and task contract', () => {
   assert.match(text, /completion notices/)
 })
 
+test('routing guidance treats delegated prerequisites as a completion barrier', () => {
+  const text = routingGuidance(config)
+  assert.match(text, /depends on the child result/)
+  assert.match(text, /end the current turn immediately without further local investigation, edits, or verification/)
+  assert.match(text, /Do not perform any part of the delegated task yourself while waiting/)
+  assert.match(text, /after delegating call-chain analysis needed for a fix, wait for the analysis before editing the fix/)
+  assert.match(text, /A started activation and its report path are not a task result/)
+  assert.match(text, /Start independent dispatches together/)
+  assert.match(text, /does not consume the child result, duplicate the child assignment, or modify overlapping files/)
+  assert.match(text, /Resume dependent work only after receiving the required completion notice and reading the result or report/)
+  assert.match(text, /Do not announce that you are waiting and then keep working in the same turn/)
+})
+
 test('disabled agents cannot be selected', () => {
   const changed = { ...config, codex: { ...config.codex, enabled: false } }
   assert.deepEqual(agentConfigs(changed).map((agent) => agent.id), ['kimi-code', 'agy', 'dsh'])

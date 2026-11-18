@@ -281,6 +281,7 @@ function setup(options = {}) {
   const runtime = createReactRuntime()
   const doc = runtime.createDocument()
   let activeLang = options.lang || 'key'
+  const shared = options.shared || {}
 
   const form = (owner) => ({
     getSnapshot: () => snapshots[owner],
@@ -337,7 +338,7 @@ function setup(options = {}) {
         if (id === 'dsh-multi-agent/ui-theme') return uiTheme
         assert.equal(id, 'react')
         return runtime.React
-      })
+      }, shared)
     },
   }
   vm.runInNewContext(clientSource, {
@@ -355,10 +356,11 @@ function setup(options = {}) {
       return { ok: true, json: async () => ({ ok: true, value: catalogs[owner] }) }
     },
   })
-  const bindTranslator = () => (key) => {
+  const bindTranslator = () => (key, values = {}) => {
     if (activeLang === 'key') return key
     const dict = dictionaries.find((entry) => entry.ns === '@kiritoko1029/dsh-multi-agent')?.dict
-    return dict?.[activeLang]?.[key] ?? key
+    const text = dict?.[activeLang]?.[key] ?? key
+    return Object.entries(values).reduce((result, [name, value]) => result.replaceAll(`{${name}}`, String(value)), text)
   }
   const slotRegistry = new Set()
   plugin.apply({
@@ -406,7 +408,7 @@ function setup(options = {}) {
   }, doc)
 
   return {
-    plugin, registrations, slotInjections, slotRegistry, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries, doc, win, winListeners, storageMap, mounted,
+    plugin, registrations, slotInjections, slotRegistry, snapshots, writes, calls, catalogRequests, requestedForms, dictionaries, doc, win, winListeners, storageMap, mounted, shared,
     headerEntry, heroEntry, overlayEntry,
     renderAll(slotProps) { return mounted.renderAll(slotProps) },
     renderHeader() { return mounted.renderAll().header },
@@ -493,7 +495,11 @@ test('removes settings.section and registers header, new-session, and overlay se
   assert.equal(trigger.props.title, '打开多 Agent 派发设置')
   assert.equal(trigger.props['aria-haspopup'], 'dialog')
   assert.equal(trigger.props['aria-expanded'], false)
-  assert.match(textOf(trigger), /多 Agent 派发/)
+  assert.equal(textOf(trigger).trim(), '', 'header trigger must be icon-only')
+  assert.equal(nodes(trigger, 'svg').length, 1)
+  const headerCss = nodes(initial.header, 'style')[0].children.join('')
+  assert.match(headerCss, /\.ma-header-btn\{[^}]*border:0;[^}]*background:transparent/)
+  assert.doesNotMatch(headerCss, /\.ma-header-btn:hover[^}]*background:/)
 
   const heroTrigger = control(initial.hero, 'multi-agent-dispatch-hero-trigger')
   assert.ok(heroTrigger, 'new session dispatch button must exist')
@@ -517,6 +523,122 @@ test('removes settings.section and registers header, new-session, and overlay se
   assert.equal(control(tree, 'acp.reasoningEffort').props.value, 'max')
   assert.equal(control(tree, 'codex.model').props.value, 'gpt-test')
   assert.equal(control(tree, 'acp.args').props.value, '[\n  "acp"\n]')
+  app.dispose()
+})
+
+test('header shows compact live counts and opens the shared task panel', () => {
+  let snapshot = {
+    runningCount: 2,
+    unreadErrorCount: 1,
+    latestActiveChildId: 'child-running',
+    latestErrorChildId: 'child-error',
+  }
+  const listeners = new Set()
+  const watched = []
+  const read = []
+  const opened = []
+  const shared = {
+    taskStore: {
+      getSnapshot: () => snapshot,
+      subscribe(sessionId, listener) {
+        assert.equal(sessionId, 'parent-1')
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      watch(sessionId) {
+        watched.push(sessionId)
+        return () => watched.push(`unwatch:${sessionId}`)
+      },
+      markErrorsRead(sessionId) { read.push(sessionId) },
+    },
+    openTasks(...args) { opened.push(args) },
+  }
+  const app = setup({ lang: 'zh', shared })
+  const slotProps = { header: { sessionId: 'parent-1' } }
+  let header = app.renderAll(slotProps).header
+  const status = button(header, 'multi-agent-task-status-trigger')
+  assert.ok(status)
+  assert.equal(status.props['aria-label'], '2 个子 Agent 运行中，1 个异常，点击打开任务面板')
+  assert.equal(textOf(status).trim().replace(/\s+/g, ' '), '2 1')
+  assert.equal(nodes(status, 'svg').length, 2, 'running and error states need distinct icons')
+  status.props.onClick()
+  assert.deepEqual(read, [], 'only the visible task panel acknowledges errors')
+  assert.deepEqual(opened, [['parent-1', 'child-running']])
+
+  snapshot = { runningCount: 0, unreadErrorCount: 0 }
+  for (const listener of listeners) listener()
+  header = app.renderAll(slotProps).header
+  assert.equal(button(header, 'multi-agent-task-status-trigger'), undefined, 'idle and normally completed tasks stay hidden')
+  assert.deepEqual(watched, ['parent-1'])
+  app.dispose()
+  assert.deepEqual(watched, ['parent-1', 'unwatch:parent-1'])
+})
+
+test('header isolates recycled sessions and follows late task-store injection', () => {
+  const active = (childId) => ({ runningCount: 1, unreadErrorCount: 0, latestActiveChildId: childId })
+  const snapshots = { 'parent-a': active('child-a'), 'parent-b': active('child-b') }
+  const listeners = new Set()
+  const watched = []
+  const opened = []
+  let storeListener
+  const taskStore = {
+    getSnapshot: (sessionId) => snapshots[sessionId],
+    subscribe(sessionId, listener) { listeners.add(listener); return () => listeners.delete(listener) },
+    watch(sessionId) { watched.push(sessionId); return () => watched.push(`unwatch:${sessionId}`) },
+  }
+  const shared = {
+    taskStore,
+    subscribeTaskStore(listener) { storeListener = listener; return () => { storeListener = undefined } },
+    openTasks(...args) { opened.push(args) },
+  }
+  const app = setup({ lang: 'en', shared })
+  let header = app.renderAll({ header: { sessionId: 'parent-a' } }).header
+  assert.equal(button(header, 'multi-agent-task-status-trigger').props['aria-label'], '1 subagents running. Open Agent tasks.')
+  header = app.renderAll({ header: { sessionId: 'parent-b' } }).header
+  const recycled = button(header, 'multi-agent-task-status-trigger')
+  assert.equal(recycled.props['aria-label'], '1 subagents running. Open Agent tasks.')
+  recycled.props.onClick()
+  assert.deepEqual(opened, [['parent-b', 'child-b']], 'the first render for B must not retain A child ids')
+  snapshots['parent-b'] = { runningCount: 0, unreadErrorCount: 0 }
+  header = app.renderAll({ header: { sessionId: 'parent-b' } }).header
+  assert.equal(button(header, 'multi-agent-task-status-trigger'), undefined)
+
+  shared.taskStore = undefined
+  storeListener(undefined)
+  header = app.renderAll({ header: { sessionId: 'parent-b' } }).header
+  assert.equal(button(header, 'multi-agent-task-status-trigger'), undefined)
+  snapshots['parent-b'] = active('child-b-new')
+  shared.taskStore = taskStore
+  storeListener(taskStore)
+  header = app.renderAll({ header: { sessionId: 'parent-b' } }).header
+  assert.ok(button(header, 'multi-agent-task-status-trigger'), 'late task availability starts watching without a session switch')
+  assert.ok(watched.includes('unwatch:parent-a'))
+  app.dispose()
+  assert.equal(storeListener, undefined)
+})
+
+test('header catches a task store published just before its first subscription', () => {
+  const watched = []
+  const taskStore = {
+    getSnapshot: () => ({ runningCount: 1, unreadErrorCount: 0, latestActiveChildId: 'child-1' }),
+    subscribe: () => () => {},
+    watch(sessionId) { watched.push(sessionId); return () => {} },
+  }
+  const shared = {
+    taskStore: undefined,
+    subscribeTaskStore() {
+      // The Store became ready after render but before listener registration;
+      // no listener notification can cover this gap.
+      shared.taskStore = taskStore
+      return () => {}
+    },
+  }
+  const app = setup({ lang: 'en', shared })
+  app.renderAll({ header: { sessionId: 'parent-1' } })
+  const header = app.renderAll({ header: { sessionId: 'parent-1' } }).header
+  assert.ok(button(header, 'multi-agent-task-status-trigger'))
+  app.renderAll({ header: { sessionId: 'parent-1' } })
+  assert.deepEqual(watched, ['parent-1'], 'the caught Store is watched exactly once')
   app.dispose()
 })
 

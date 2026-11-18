@@ -82,7 +82,7 @@ const output = {
   render: (_args, value) => [{
     type: 'text',
     text: value.kind === 'activation'
-      ? `started ${value.agent} subagent ${value.subagentId}\nReport path: ${value.reportPath}`
+      ? `started ${value.agent} subagent ${value.subagentId}\nResult status: pending; this start acknowledgement is not the task result. If dependent work remains, end the turn and wait for the completion notice.\nReport path: ${value.reportPath}`
       : `dispatch cancelled: ${value.reason}`,
   }],
 }
@@ -142,7 +142,7 @@ export function apply(ctx, config) {
 
   const definition = {
     name: 'dispatch_agent',
-    description: 'Delegate one self-contained task to DSH, Codex, Kimi Code, or Google Antigravity (agy) using the configured prompt-based routing rules. The child works independently and does not share this conversation. This tool returns a managed child id and report path immediately; a later completion notice contains the requested final answer or failure. Reports default to .dsh/agent-reports in the child workspace unless report_path overrides the location. DSH children support native model selection and continuation; Codex, Kimi Code, and agy children are external runs with continuation when a session id is saved.',
+    description: 'Delegate one self-contained task to DSH, Codex, Kimi Code, or Google Antigravity (agy) using the configured prompt-based routing rules. The child works independently and does not share this conversation. This tool returns a managed child id and report path immediately; a later completion notice contains the requested final answer or failure. A start acknowledgement is not a task result: when downstream work depends on the child, end the turn after dispatch and wait for the completion notice instead of doing the delegated work yourself. Reports default to .dsh/agent-reports in the child workspace unless report_path overrides the location. DSH children support native model selection and continuation; Codex, Kimi Code, and agy children are external runs with continuation when a session id is saved.',
     parameters: {
       type: 'object',
       additionalProperties: false,

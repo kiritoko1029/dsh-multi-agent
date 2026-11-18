@@ -1,6 +1,6 @@
 window.__ModuleLoader__.load({
   id: '@kiritoko1029/dsh-multi-agent',
-  factory(require) {
+  factory(require, shared = {}) {
     const React = require('react')
     const uiTheme = require('dsh-multi-agent/ui-theme')
     const h = React.createElement
@@ -151,6 +151,9 @@ window.__ModuleLoader__.load({
         'common.proxyHint': 'External CLIs read only environment proxies. "Follow system proxy" injects the OS proxy as HTTP(S)_PROXY; a custom address overrides it.',
         'common.invalidProxyUrl': 'Enter a proxy address such as http://127.0.0.1:7890.',
         'header.tooltip': 'Open multi-agent dispatch settings',
+        'header.running': '{count} subagents running. Open Agent tasks.',
+        'header.errors': '{count} subagent issues. Open Agent tasks.',
+        'header.mixed': '{running} subagents running, {errors} with issues. Open Agent tasks.',
         'modal.close': 'Close',
         'modal.closeAria': 'Close multi-agent dispatch settings',
         'modal.navAria': 'Settings sections',
@@ -314,6 +317,9 @@ window.__ModuleLoader__.load({
         'common.proxyHint': '外部 CLI 只认环境变量代理：「跟随系统代理」会把系统代理注入 HTTP(S)_PROXY，自定义地址则覆盖它。',
         'common.invalidProxyUrl': '代理地址需形如 http://127.0.0.1:7890。',
         'header.tooltip': '打开多 Agent 派发设置',
+        'header.running': '{count} 个子 Agent 运行中，点击打开任务面板',
+        'header.errors': '{count} 个子 Agent 异常，点击打开任务面板',
+        'header.mixed': '{running} 个子 Agent 运行中，{errors} 个异常，点击打开任务面板',
         'modal.close': '关闭',
         'modal.closeAria': '关闭多 Agent 派发设置',
         'modal.navAria': '设置分组',
@@ -345,18 +351,24 @@ window.__ModuleLoader__.load({
     }
 
     const HEADER_CSS = `
-.ma-header-utility{display:inline-flex;align-items:center;flex:0 0 auto;min-width:0}
+.ma-header-utility{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;min-width:0}
 .ma-header-utility *{box-sizing:border-box}
-.ma-header-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;min-width:0;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:border-color 180ms ease,background-color 180ms ease,color 180ms ease,transform 180ms ease}
-.ma-header-btn:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+.ma-header-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:28px;height:28px;min-width:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;font-weight:550;line-height:1;white-space:nowrap;cursor:pointer;-webkit-app-region:no-drag;transition:color 180ms ease,transform 180ms ease}
+.ma-header-btn:hover:not(:disabled){color:var(--dsw-alias-label-primary)}
 .ma-header-btn:active:not(:disabled){transform:translateY(1px)}
-.ma-header-btn[aria-expanded="true"]{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}
+.ma-header-btn[aria-expanded="true"]{color:var(--dsw-alias-brand-primary)}
 .ma-header-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .ma-header-btn:disabled{opacity:.52;cursor:not-allowed}
-.ma-header-icon{width:14px;height:14px;flex:0 0 auto}
-.ma-header-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:540px){.ma-header-btn{padding:0 8px;gap:5px;font-size:11px;max-width:148px}}
-@media(prefers-reduced-motion:reduce){.ma-header-utility *{transition:none!important;transform:none!important}}
+.ma-header-status{width:auto;min-width:24px;padding:0 2px;font-variant-numeric:tabular-nums}
+.ma-header-icon{width:16px;height:16px;flex:0 0 auto}
+.ma-header-status-icon{width:14px;height:14px;flex:0 0 auto}
+.ma-header-running,.ma-header-error{display:inline-flex;align-items:center;gap:3px;font-variant-numeric:tabular-nums}
+.ma-header-running{color:var(--dsw-alias-brand-primary)}
+.ma-header-error{color:var(--dsw-alias-state-error-primary)}
+.ma-header-spinner{animation:ma-header-spin 1s linear infinite;transform-origin:center}
+.ma-header-live{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@keyframes ma-header-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.ma-header-utility *{transition:none!important;animation:none!important;transform:none!important}}
 `
 
     // Blank sessions hide the conversation header chrome, so the header seat is
@@ -587,6 +599,22 @@ window.__ModuleLoader__.load({
         className: 'ma-header-icon',
         strokeWidth: 1.7,
         paths: ['M4 6h16', 'M4 12h16', 'M4 18h16', 'M9 4v4', 'M15 10v4', 'M11 16v4'],
+      })
+    }
+
+    function RunningIcon() {
+      return h(SvgIcon, {
+        className: 'ma-header-status-icon ma-header-spinner',
+        strokeWidth: 1.9,
+        paths: ['M21 12a9 9 0 1 1-6.22-8.56'],
+      })
+    }
+
+    function ErrorIcon() {
+      return h(SvgIcon, {
+        className: 'ma-header-status-icon',
+        strokeWidth: 1.8,
+        paths: ['M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0z', 'M12 9v4', 'M12 17h.01'],
       })
     }
 
@@ -842,26 +870,75 @@ window.__ModuleLoader__.load({
       hero: { name: 'multi-agent-dispatch-hero-trigger', css: HERO_CSS, rootClass: 'ma-hero-utility', buttonClass: 'ma-hero-btn', labelClass: 'ma-hero-label' },
     }
 
-    function DispatchButton({ store, t, variant = 'header' }) {
+    const EMPTY_HEADER_TASKS = Object.freeze({ runningCount: 0, unreadErrorCount: 0 })
+
+    function useHeaderTaskIndicator(sessionId, enabled) {
+      const [taskStore, setTaskStore] = useState(shared.taskStore)
+      const [, setRevision] = useState(0)
+      useEffect(() => {
+        const unsubscribe = shared.subscribeTaskStore?.(setTaskStore)
+        // Close the render → subscription gap: publishing before the listener
+        // registration must still synchronously seed the current Store.
+        setTaskStore(shared.taskStore)
+        return unsubscribe
+      }, [])
+      useEffect(() => {
+        if (!enabled || !sessionId || !taskStore) return undefined
+        const update = () => setRevision((value) => value + 1)
+        const unsubscribe = taskStore.subscribe(sessionId, update)
+        const unwatch = taskStore.watch(sessionId)
+        update()
+        return () => { unsubscribe(); unwatch() }
+      }, [taskStore, sessionId, enabled])
+      // Read the current key during render: a recycled header must never show
+      // the previous session's child or navigate it under the new parent id.
+      return enabled && sessionId && taskStore
+        ? taskStore.getSnapshot(sessionId) || EMPTY_HEADER_TASKS
+        : EMPTY_HEADER_TASKS
+    }
+
+    function DispatchButton({ store, t, variant = 'header', sessionId }) {
       const open = useDispatchModalOpen(store)
       const buttonRef = useRef(null)
       const label = t('unified.title')
       const face = DISPATCH_TRIGGERS[variant] || DISPATCH_TRIGGERS.header
+      const indicator = useHeaderTaskIndicator(sessionId, variant === 'header')
+      const running = indicator.runningCount || 0
+      const errors = indicator.unreadErrorCount || 0
+      const statusLabel = running > 0 && errors > 0
+        ? t('header.mixed', { running, errors })
+        : running > 0
+          ? t('header.running', { count: running })
+          : errors > 0 ? t('header.errors', { count: errors }) : ''
+      const statusChildId = indicator.latestActiveChildId || indicator.latestErrorChildId
+      const settingsButton = h('button', {
+        ref: buttonRef,
+        type: 'button',
+        name: face.name,
+        className: face.buttonClass,
+        title: t('header.tooltip'),
+        'aria-label': label,
+        'aria-haspopup': 'dialog',
+        'aria-expanded': open,
+        onClick: () => store.open(buttonRef.current),
+      },
+      h(HeaderIcon),
+      variant === 'hero' ? h('span', { className: face.labelClass }, label) : null)
+      const statusButton = statusLabel ? h('button', {
+        type: 'button',
+        name: 'multi-agent-task-status-trigger',
+        className: 'ma-header-btn ma-header-status',
+        title: statusLabel,
+        'aria-label': statusLabel,
+        onClick: () => shared.openTasks?.(sessionId, statusChildId),
+      },
+      running > 0 ? h('span', { className: 'ma-header-running' }, h(RunningIcon), h('span', null, running)) : null,
+      errors > 0 ? h('span', { className: 'ma-header-error' }, h(ErrorIcon), h('span', null, errors)) : null) : null
       return h('span', { className: face.rootClass },
         h('style', null, face.css),
-        h('button', {
-          ref: buttonRef,
-          type: 'button',
-          name: face.name,
-          className: face.buttonClass,
-          title: t('header.tooltip'),
-          'aria-label': label,
-          'aria-haspopup': 'dialog',
-          'aria-expanded': open,
-          onClick: () => store.open(buttonRef.current),
-        },
-        h(HeaderIcon),
-        h('span', { className: face.labelClass }, label)))
+        settingsButton,
+        statusButton,
+        h('span', { className: 'ma-header-live', role: 'status', 'aria-live': 'polite' }, statusLabel))
     }
 
     const MODAL_TITLE_ID = 'ma-dispatch-modal-title'

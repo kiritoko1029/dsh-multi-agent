@@ -202,7 +202,13 @@ test('omitted report_path gets a unique default report and a visible start resul
   assert.match(first.reportPath, new RegExp(`^${defaultDirPrefix}.+-test-delegation-.+\\.md$`))
   assert.notEqual(first.reportPath, second.reportPath)
   assert.match(state.starts[0].request.prompt[0].text, new RegExp(escapeRegExp(first.reportPath)))
-  assert.match(state.definition.output.render(args, first)[0].text, new RegExp(`Report path: ${escapeRegExp(first.reportPath)}`))
+  const startText = state.definition.output.render(args, first)[0].text
+  assert.match(startText, new RegExp(`Report path: ${escapeRegExp(first.reportPath)}`))
+  assert.match(startText, /Result status: pending/)
+  assert.match(startText, /this start acknowledgement is not the task result/)
+  assert.match(startText, /If dependent work remains, end the turn and wait for the completion notice/)
+  assert.match(state.definition.description, /A start acknowledgement is not a task result/)
+  assert.match(state.definition.description, /when downstream work depends on the child, end the turn after dispatch/)
 })
 
 test('DSH dispatch passes configured default model options to the native spawn provider', async () => {
