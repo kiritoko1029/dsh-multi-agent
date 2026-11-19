@@ -10,7 +10,7 @@ function setup(storageDomain) {
     agents: { roots: () => [] },
     storageDomain,
     webServer: { register(route) { state.route = route; return () => {} }, getOrigin: () => 'http://localhost:1234' },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     reflect: { provide() {} },
     logger: { warn(...args) { state.warnings.push(args) } },
     effect(callback) { const cleanup = callback(); effects.push(cleanup); return cleanup },

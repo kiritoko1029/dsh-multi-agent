@@ -797,17 +797,9 @@ export class MultiAgentTasks extends Service {
   }
 
   async handleHttp(req, res) {
-    let admission
-    try {
-      admission = this.ctx.connection.admit(req)
-    } catch {
-      admission = undefined
-    }
-    const refusal = admission && 'rejection' in admission && admission.rejection !== undefined ? admission.rejection
-      : admission?.peer?.principal?.kind === 'owner' ? undefined
-        : 403
-    if (refusal !== undefined) {
-      this.sendJson(res, refusal, { ok: false, error: { code: 'forbidden', message: 'Owner access required' } })
+    const refused = this.ctx.connection.requestRejection(req)
+    if (refused !== undefined) {
+      this.sendJson(res, refused, { ok: false, error: { code: 'forbidden', message: 'Owner access required' } })
       return
     }
     if (!['GET', 'POST'].includes(req.method)) {

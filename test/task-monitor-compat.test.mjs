@@ -17,7 +17,7 @@ function harness(modern = true) {
     } : {},
     reflect: { provide() {} },
     webServer: { getOrigin: () => 'http://localhost', register: () => () => {} },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     tools: { register: (definition, options) => { tools.push({ definition, options }); return () => {} } },
     logger: { warn() {} },
     on(name, callback) { listeners.set(name, callback) },

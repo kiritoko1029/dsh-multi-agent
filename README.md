@@ -4,7 +4,7 @@
 
 ## 安装（DSH 用户）
 
-1. 确认 DSH 版本为 `0.2.2-rc.3`，不要通过版本豁免强行安装。
+1. 确认 DSH 版本为 `0.2.2-rc.5`，不要通过版本豁免强行安装。
 2. 从 [GitHub Releases](https://github.com/kiritoko1029/dsh-multi-agent/releases) 下载稳定版的 TGZ 安装包，可同时下载同名 `.sha256` 文件核对传输完整性。TGZ 不需要解压。
 3. 把 TGZ 文件或它在 DSH 所在电脑上的绝对路径发给 DSH，并发送：
 
@@ -26,7 +26,7 @@
 
 ## DSH 版本兼容
 
-**0.10.0 起仅支持 DSH `0.2.2-rc.3`**，`engines.dsh` 已同步收窄。RC1/RC2 不再属于兼容性或交付验收范围，不要通过版本豁免强行安装到这些版本。
+**0.11.2 起仅支持 DSH `0.2.2-rc.5`**，`engines.dsh` 已同步更新。其它版本不属于当前兼容范围，不要通过版本豁免强行安装。
 
 - 插件仍根据注入的 Host 服务能力检查接口；不识别或混合的接口组合会拒绝启动，不在派发失败后换参数格式重试，避免重复创建任务。
 - 仓库中保留的历史适配代码与 RC 契约脚本仅供旧版本维护和诊断，不构成对 RC1/RC2 的兼容承诺；默认测试不再运行真实上游双版本矩阵。
@@ -90,7 +90,7 @@ DSH Subagent Manager
 
 ## 前置条件
 
-1. 使用 DSH `0.2.2-rc.3`，在自己的 DSH 中配置可用模型。只有使用外部 Agent 时才需要对应 CLI；不必把全部 CLI 装齐。
+1. 使用 DSH `0.2.2-rc.5`，在自己的 DSH 中配置可用模型。只有使用外部 Agent 时才需要对应 CLI；不必把全部 CLI 装齐。
 2. 使用 Codex 时，在本机安装并登录 Codex CLI。本插件独立注册 `codex-router` Provider，不要求启用官方 Codex 工具 bundle。
 3. 使用 Kimi 时，在本机安装并登录新版 Kimi Code CLI。优先检测当前用户的 `~/.kimi-code/bin/kimi`，然后搜索 PATH；可用 `KIMI_COMMAND` 覆盖检测路径。
 4. 使用 Antigravity 时，在本机安装并登录 `agy`，通过 `agy --version` 和 `agy acp --help` 检查。优先检测当前用户的 `~/.local/bin/agy`，然后搜索 PATH；可用 `AGY_COMMAND` 覆盖检测路径。

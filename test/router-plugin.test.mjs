@@ -59,7 +59,7 @@ function harness(config = makeConfig(), activationOverrides = {}, answer, modern
       get(name) { return state.definition?.name === name ? state.definition : undefined },
     },
     webServer: { getOrigin: () => 'http://localhost', register(route) { state.taskRoute = route; return () => {} } },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     reflect: { provide(name, value) { state[name] = value; ctx[name] = value } },
     get(name) { return state[name] },
     subagents: {

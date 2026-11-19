@@ -9,7 +9,7 @@ function harness(saved = new Map()) {
   const ctx = {
     reflect: { provide() {} },
     webServer: { getOrigin: () => 'http://localhost:1234', register(route) { state.route = route; return () => {} } },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     agents: { roots: () => [root] },
     tools: { register(tool) { state.tools.push(tool); return () => {} } },
     storageDomain: { open: async () => ({ table: () => ({ entries: () => saved.entries(), put: async (key, value) => { saved.set(key, structuredClone(value)) }, delete: async (key) => saved.delete(key) }), close: async () => {} }) },

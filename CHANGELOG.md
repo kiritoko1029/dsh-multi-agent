@@ -2,6 +2,19 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
+## [0.11.2] - 2026-11-19
+
+### 变更
+
+- 适配 DSH `0.2.2-rc.5`：`engines.dsh`、README 和安装说明同步更新，其它 Host 版本不再属于当前兼容范围，无需版本豁免。
+- 按插件收录审核要求，任务与模型目录的 `webServer.register` 路由统一在 handler 开头调用 `ctx.connection.requestRejection(req)`，并返回 DSH 给出的 401/403；相关测试桩与拒绝路径回归同步更新。
+
+### 验证
+
+- 按 rc.3 → rc.4 → rc.5 升级指南检查受影响面；两项变更分别为 DeepSeek 内容拒答错误码和 DeepSeek 模型网页搜索默认值，本插件均未使用，无需额外迁移。
+- 通过当前 rc.5 Desktop Runtime Inspect 核对 Agent/Subagent 服务、扁平 activation、`session/event`、`subagent/start` / `subagent/end` 及会话顶栏、开始页和右侧栏 Slot 契约。
+- 新增发布清单 Host 版本与生产依赖隔离回归；完整测试、Client 构建和 TGZ 发布包检查纳入本轮交付门禁。
+
 ## [0.11.1] - 2026-11-18
 
 ### 变更

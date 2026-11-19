@@ -126,7 +126,7 @@ function harness(model, overrides = {}, availability = { codex: true, codexComma
         }
       },
     },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     effect: (callback) => callback(),
     get(name) { return name === 'multiAgentTasks' ? tasks : availability },
     logger: { warn() {} },
@@ -276,7 +276,7 @@ async function officialProtocolRun(values) {
     subprocess: { spawn(spec) { spawns.push(spec); return spawnCodexChild(spec) } },
     subagents: { registerProvider(value) { provider = value } },
     webServer: { register: () => () => {} },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     effect: (callback) => callback(),
     logger: { warn() {} },
   }
@@ -492,7 +492,7 @@ async function vendoredPermissionRun(values) {
     subprocess: { spawn: (spec) => spawnCodexChild(spec) },
     subagents: { registerProvider(value) { provider = value } },
     webServer: { register: () => () => {} },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     effect: (callback) => callback(),
     logger: { warn() {} },
   }

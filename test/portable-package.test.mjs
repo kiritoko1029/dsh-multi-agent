@@ -453,7 +453,7 @@ async function mountPortablePatch(entries, { applyCodexOfficial } = {}) {
         },
       })
       hostCtx.reflect.provide('connection', {
-        admit: () => ({ peer: { principal: { kind: 'owner' } } }),
+        requestRejection: () => undefined,
       })
       hostCtx.reflect.provide('multiAgentTasks', {
         observeACP() {},
@@ -538,6 +538,13 @@ function loadStagePatchEntries(extraPatches = []) {
   const stagePatches = parseEntryPatchYaml(rawYaml)
   return applyEntryPatches([], [...stagePatches, ...extraPatches])
 }
+
+test('package targets DSH rc.5 without production Host runtime dependencies', () => {
+  const manifest = JSON.parse(readFileSync(join(STAGE_ROOT, 'package.json'), 'utf8'))
+  assert.deepEqual(manifest.engines, { dsh: '0.2.2-rc.5' })
+  const hostPackages = Object.keys(manifest.dependencies ?? {}).filter((name) => name.startsWith('@deepseek-ai/dsh-'))
+  assert.deepEqual(hostPackages, [])
+})
 
 test('published files contain no personal home paths or packager username', () => {
   const publishedFiles = collectPublishedFiles()

@@ -5,11 +5,11 @@ import { MultiAgentTasks, TASK_ACTIVITY_LIMIT, TASK_RECORD_LIMIT, TASK_TEXT_LIMI
 import { createCodexObservationStream } from '../lib/task-monitor-codex.js'
 
 function harness() {
-  const state = { admission: { peer: { principal: { kind: 'owner' } } } }
+  const state = { rejection: undefined }
   const ctx = {
     agents: { roots: () => [] },
     webServer: { getOrigin: () => 'http://localhost:1234', register(route) { state.route = route; return () => {} } },
-    connection: { admit() { return state.admission } },
+    connection: { requestRejection() { return state.rejection } },
     effect(callback) { return callback() },
     logger: { warn() {} },
     reflect: { provide() {} },
@@ -147,7 +147,7 @@ test('Codex observation Transform preserves arbitrary byte boundaries and ignore
   assert.deepEqual(malformed.read(), malformedPayload)
 })
 
-test('HTTP is owner-only and enforces parent isolation, missing history and method checks', async () => {
+test('HTTP applies DSH request rejection and enforces parent isolation, missing history and method checks', async () => {
   const { state, tasks, begin, request } = harness()
   const trace = begin('parent-a')
   tasks.bind(trace, 'child-a')
@@ -166,9 +166,9 @@ test('HTTP is owner-only and enforces parent isolation, missing history and meth
   assert.equal((await request('')).status, 400)
   assert.equal((await request('?parentSessionId=parent-a', 'POST')).status, 403)
   assert.equal((await request('?parentSessionId=parent-a', 'DELETE')).status, 405)
-  state.admission = { rejection: 401 }
+  state.rejection = 401
   assert.equal((await request('?parentSessionId=parent-a')).status, 401)
-  state.admission = { peer: { principal: { kind: 'shared' } } }
+  state.rejection = 403
   assert.equal((await request('?parentSessionId=parent-a')).status, 403)
 })
 

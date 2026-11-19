@@ -179,7 +179,7 @@ function harness(overrides = {}) {
     } },
     subagents: { registerProvider(value) { provider = value } },
     webServer: { register: () => () => {} },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     effect: (callback) => callback(),
     logger: { warn(...args) { errors.push(args) } },
   }

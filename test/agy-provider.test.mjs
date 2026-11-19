@@ -153,7 +153,7 @@ function harness({ model: initialModel, reasoningEffort: initialEffort, availabl
     subagents: { registerProvider(value) { state.provider = value } },
     webServer: { register(route) { state.route = route; return () => {} } },
     effect: (callback) => callback(),
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     logger: { warn(message) { state.warnings.push(message) } },
   }
   apply(ctx, config)

@@ -47,15 +47,20 @@ test('agy catalog rejects missing model metadata rather than guessing', () => {
   assert.throws(() => agyCatalogFromSession({ configOptions: [] }), /model config is unavailable/)
 })
 
-test('catalog route returns JSON headers and owner-only model data', async () => {
+test('catalog route applies DSH request rejection and returns JSON model data', async () => {
   let route
+  let loads = 0
+  const state = { rejection: undefined }
   const ctx = {
     effect: (callback) => callback(),
     webServer: { register: (value) => { route = value; return () => {} } },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => state.rejection },
     logger: { warn() {} },
   }
-  registerModelCatalogRoute(ctx, 'codex', async () => ({ groups: [], failures: [] }))
+  registerModelCatalogRoute(ctx, 'codex', async () => {
+    loads += 1
+    return { groups: [], failures: [] }
+  })
   assert.equal(route.kind, 'exact')
   const response = {
     writeHead(status, headers) { this.status = status; this.headers = headers },
@@ -65,6 +70,13 @@ test('catalog route returns JSON headers and owner-only model data', async () =>
   assert.equal(response.status, 200)
   assert.equal(response.headers['content-type'], 'application/json; charset=utf-8')
   assert.deepEqual(JSON.parse(response.body), { ok: true, value: { groups: [], failures: [] } })
+  state.rejection = 401
+  await route.handler({ method: 'GET' }, response)
+  assert.equal(response.status, 401)
+  state.rejection = 403
+  await route.handler({ method: 'GET' }, response)
+  assert.equal(response.status, 403)
+  assert.equal(loads, 1)
 })
 
 test('catalog failures are classified for the UI without echoing CLI output', async () => {
@@ -77,7 +89,7 @@ test('catalog failures are classified for the UI without echoing CLI output', as
   const ctx = {
     effect: (callback) => callback(),
     webServer: { register: (value) => { route = value; return () => {} } },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     logger: { warn() {} },
   }
   registerModelCatalogRoute(ctx, 'agy', async () => { throw new Error('Authentication required for C:\\secret\\agy.exe') })

@@ -50,7 +50,7 @@ function harness(modern, timeoutSeconds = 10) {
     llm: { resolveCallConfig: async (config) => config },
     userQuestions: { ask: async () => { throw new Error('Unexpected question') } },
     webServer: { register: () => () => {} },
-    connection: { admit: () => ({ peer: { principal: { kind: 'owner' } } }) },
+    connection: { requestRejection: () => undefined },
     reflect: { provide(name, value) { ctx[name] = value } },
     get(name) { return ctx[name] },
     on(name, listener) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(listener); return () => listeners.get(name).delete(listener) },
