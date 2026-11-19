@@ -1,8 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { Service } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import { addUsage, codexUsage, mergeTelemetry, normalizeUsage, telemetrySchema } from './lib/task-telemetry.js'
+import { CODEX_PERMISSION_CHOICES, NATIVE_SANDBOX_MODES, taskPermissionChoices } from './lib/task-permissions.js'
 import { findRootAgent, isModernSubagentRuntime, isRootAgent } from './lib/runtime-compat.js'
 
 export const TASK_TEXT_LIMIT = 16 * 1024
@@ -90,6 +91,8 @@ const storedTaskSchema = z.object({
   archived: z.boolean(), hidden: z.boolean(), continuationCount: z.number().default(0),
   continuation: z.object({ agent: z.enum(['codex', 'kimi-code', 'agy']), sessionId: z.string().min(1) }).optional(),
   output: z.string().optional(), diagnostic: z.string().optional(), truncated: z.boolean().default(false),
+  permissionChoice: z.enum(CODEX_PERMISSION_CHOICES).optional(),
+  nativeSandboxDefault: z.enum(NATIVE_SANDBOX_MODES).optional(),
   telemetry: telemetrySchema.optional(),
   telemetryTurn: z.string().max(1024).optional(),
   nativeSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
@@ -104,6 +107,7 @@ export class MultiAgentTasks extends Service {
   static inject = ['webServer', 'connection', 'agents', 'subagents', 'storageDomain']
   constructor(ctx, options = {}) {
     super(ctx, 'multiAgentTasks')
+    this.panelKey = randomBytes(32)
     this.records = new Set()
     this.revision = 0
     this.pendingWrites = Promise.resolve()
@@ -175,6 +179,7 @@ export class MultiAgentTasks extends Service {
       status: record.status, startedAt: record.startedAt, updatedAt: record.updatedAt, finishedAt: record.finishedAt,
       archived: Boolean(record.archived), hidden: Boolean(record.hidden), continuationCount: record.continuationCount || 0,
       continuation: record.continuation, output: record.output, diagnostic: record.diagnostic, truncated: record.truncated,
+      permissionChoice: record.permissionChoice, nativeSandboxDefault: record.nativeSandboxDefault,
       telemetry: record.telemetry,
       nativeSeq: record.nativeSeq,
     }
@@ -241,7 +246,7 @@ export class MultiAgentTasks extends Service {
       if (record.trace !== trace || trace.accepted) return
       for (const callback of trace.settledCallbacks) callback()
       const generation = record.generation
-      Object.assign(record, previous, { generation })
+      Object.assign(record, previous, { generation, permissionChoice: record.permissionChoice, nativeSandboxDefault: record.nativeSandboxDefault })
       if (pendingTelemetry) this.pendingNativeTelemetry.set(record.activeChildId || record.childId, pendingTelemetry)
       record.trace = { record, generation, settledCallbacks: new Set() }
       trace.record = record
@@ -592,6 +597,7 @@ export class MultiAgentTasks extends Service {
     if (previousEnd) { previousEnd.title = `Task ${status}`; previousEnd.status = status; this.touch(record) }
     else if (record.activities.length < TASK_ACTIVITY_LIMIT) this.append(trace, { id: 'end', type: 'status', title: `Task ${status}`, status })
     else this.touch(record)
+    delete trace.permissions
     record.finishedAt = finishedAt
     record.archived = true
     this.persist(record)
@@ -781,12 +787,74 @@ export class MultiAgentTasks extends Service {
   return { revision: this.revision, tasks, ...(this.storageError ? { storageWarning: this.storageError } : {}) }
 }
 
+  nativePermissionTarget(record) {
+    const id = record.activeChildId || record.childId
+    const child = this.ctx.agents.get?.(id)
+    if (!child || child.id !== id || child.session?.id !== id || child.session.header?.origin !== 'subagent') return undefined
+    try {
+      const root = this.ctx.subagents.rootOf(child)
+      if (!root || root === child || root !== findRootAgent(this.ctx, record.parentSessionId)) return undefined
+      const mode = child.ctx.get('sandboxPolicy')?.resolve({ session: child.session })?.mode
+      if (NATIVE_SANDBOX_MODES.includes(mode)) return { child, mode }
+    } catch { /* A settled or detached native session has no live policy target. */ }
+  }
+
+  permissionView(record) {
+    if (record.agent === 'dsh') {
+      const target = this.nativePermissionTarget(record)
+      if (!target) return { kind: 'native', editable: false }
+      const baseline = record.nativeSandboxDefault ?? target.mode
+      return { kind: 'native', choices: ['default', ...NATIVE_SANDBOX_MODES], editable: true, defaultChoice: baseline, effective: target.mode,
+        selected: target.mode === baseline ? 'default' : target.mode }
+    }
+    const run = record.trace.permissions
+    if (run) return { kind: 'external', choices: taskPermissionChoices(record.agent), editable: true, ...run.view() }
+    if (!record.providerName || this.ctx.subagents?.getProvider?.(record.providerName)?.taskPermissionAgent !== record.agent) return undefined
+    return { kind: 'external', choices: taskPermissionChoices(record.agent), editable: !!record.continuation, selected: record.permissionChoice ?? 'default' }
+  }
+
+  // Only the authenticated panel can call this mutation. Serialize with history writes and
+  // publish an external override after the durable write succeeds, including on cold resume.
+  setTaskPermission(parentSessionId, childId, choice) {
+    const change = this.pendingWrites.then(async () => {
+      const record = this.getRecord(parentSessionId, childId)
+      if (typeof childId !== 'string' || !childId || !record || record.hidden || !this.permissionView(record)?.editable) {
+        throw new Error('Permission settings are unavailable for this task')
+      }
+      if (record.agent === 'dsh') {
+        if (choice !== 'default' && !NATIVE_SANDBOX_MODES.includes(choice)) throw new Error('Invalid native sandbox mode')
+        const target = this.nativePermissionTarget(record)
+        if (!target) throw new Error('The native child is no longer active')
+        const baseline = record.nativeSandboxDefault ?? target.mode
+        if (record.nativeSandboxDefault === undefined && this.table) {
+          await this.table.put(taskKey(record), { ...this.stored(record), nativeSandboxDefault: baseline })
+        }
+        record.nativeSandboxDefault = baseline
+        const current = this.nativePermissionTarget(record)
+        if (current?.child !== target.child) throw new Error('The native child changed before the update')
+        const mode = choice === 'default' ? baseline : choice
+        // rc.5 setSandboxMode writes precisely this event. The child's native approval policy stays in force.
+        if (current.mode !== mode) current.child.session.append('sandbox/mode', { mode })
+      } else {
+        if (!taskPermissionChoices(record.agent).includes(choice)) throw new Error('Invalid task permission policy')
+        if (this.table) await this.table.put(taskKey(record), { ...this.stored(record), permissionChoice: choice })
+        record.permissionChoice = choice
+        record.trace.permissions?.select(choice)
+      }
+      this.touch(record)
+      return { permission: this.permissionView(record), revision: this.revision }
+    })
+    this.pendingWrites = change.catch(() => {})
+    return change
+  }
+
   detail(parentSessionId, childId) {
     const record = this.getRecord(parentSessionId, childId)
     return record ? {
       ...this.summary(record),
       ...record.output === undefined ? {} : { output: record.output },
       ...record.diagnostic === undefined ? {} : { diagnostic: record.diagnostic },
+      permission: this.permissionView(record),
       activities: record.activities.map(copyActivity),
     } : null
   }
@@ -794,6 +862,10 @@ export class MultiAgentTasks extends Service {
   sendJson(res, status, value) {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
     res.end(JSON.stringify(value))
+  }
+
+  panelProof(parentSessionId) {
+    return createHmac('sha256', this.panelKey).update(parentSessionId).digest('hex')
   }
 
   async handleHttp(req, res) {
@@ -811,11 +883,12 @@ export class MultiAgentTasks extends Service {
       this.sendJson(res, 503, { ok: false, error: { code: 'storage', message: 'Task history storage is unavailable' } })
       return
     }
+    const origin = req.headers?.origin
+    const foreign = (origin !== undefined && origin !== this.ctx.webServer.getOrigin() && origin !== 'dsh-app://app') || req.headers?.['sec-fetch-site'] === 'cross-site'
     if (req.method === 'POST') {
-      // Cookie-bearing mutations require a same-origin JSON fetch; GET remains read-only.
-      const origin = req.headers?.origin
-      const trustedOrigin = origin === this.ctx.webServer.getOrigin() || origin === 'dsh-app://app'
-      if (!trustedOrigin || !String(req.headers?.['content-type'] || '').toLowerCase().startsWith('application/json') || req.headers?.['sec-fetch-site'] === 'cross-site') {
+      const proof = req.headers?.['x-dsh-task-proof']
+      const json = String(req.headers?.['content-type'] ?? '').split(';')[0].trim().toLowerCase() === 'application/json'
+      if (foreign || !json || (origin === undefined && (typeof proof !== 'string' || !/^[a-f0-9]{64}$/.test(proof)))) {
         this.sendJson(res, 403, { ok: false, error: { code: 'origin', message: 'Same-origin JSON request required' } })
         return
       }
@@ -827,11 +900,18 @@ export class MultiAgentTasks extends Service {
         }
         const args = JSON.parse(body)
         if (!args || typeof args.parentSessionId !== 'string' || !args.parentSessionId) throw new Error('parentSessionId is required')
+        // Desktop validates Origin in Electron, then removes it before forwarding the request.
+        if (origin === undefined && !timingSafeEqual(Buffer.from(proof), Buffer.from(this.panelProof(args.parentSessionId)))) {
+          this.sendJson(res, 403, { ok: false, error: { code: 'origin', message: 'Invalid task panel proof' } })
+          return
+        }
         let value
         if (args.action === 'continue') {
           const agent = findRootAgent(this.ctx, args.parentSessionId)
           if (!agent) throw new Error('Open the parent conversation before continuing this task')
           value = await this.continueTask(agent, { childId: args.childId, message: args.message }, new AbortController().signal)
+        } else if (args.action === 'set-permission') {
+          value = await this.setTaskPermission(args.parentSessionId, args.childId, args.choice)
         } else value = this.manage(args.parentSessionId, args)
         await this.pendingWrites
         this.sendJson(res, 200, { ok: true, value })
@@ -844,6 +924,14 @@ export class MultiAgentTasks extends Service {
     const parentSessionId = url.searchParams.get('parentSessionId')
     if (!parentSessionId) {
       this.sendJson(res, 400, { ok: false, error: { code: 'request', message: 'parentSessionId is required' } })
+      return
+    }
+    if (url.searchParams.get('view') === 'action-proof') {
+      if (foreign || req.headers?.['x-dsh-task-panel'] !== '1') {
+        this.sendJson(res, 403, { ok: false, error: { code: 'origin', message: 'Task panel request required' } })
+        return
+      }
+      this.sendJson(res, 200, { ok: true, value: { proof: this.panelProof(parentSessionId) } })
       return
     }
     if (url.searchParams.has('childId')) {

@@ -428,3 +428,29 @@ test('agy continuation does not mistake load replay for current usage or replace
   assert.equal((agent.state.telemetry ?? []).some((value) => value?.modelSource === 'configured'), false)
   assert.equal((agent.state.telemetry ?? []).some((value) => value?.usage !== undefined), false)
 })
+
+test('agy stages entering and leaving native bypass until the next activation', async () => {
+  const agent = harness({ permission: 'human' })
+  const trace = { record: { agent: 'agy', cwd: process.cwd() } }
+  await agent.run(trace)
+  trace.permissions.select('subagent:full-access')
+  assert.equal(trace.permissions.view().effective, 'human')
+  assert.equal(trace.permissions.view().pending, true)
+  trace.record.permissionChoice = 'subagent:full-access'
+  await agent.run(trace)
+  assert.equal(agent.state.spawns.at(-1).argv.includes('--dangerously-skip-permissions'), true)
+  trace.permissions.select('reject')
+  assert.equal(trace.permissions.view().launcher, 'acp-bypass')
+  assert.equal(trace.permissions.view().pending, true)
+  trace.record.permissionChoice = 'reject'
+  await agent.run(trace)
+  assert.equal(agent.state.spawns.at(-1).argv.includes('--dangerously-skip-permissions'), false)
+})
+
+
+test('agy region rejection observed on Desktop is a failed run', async () => {
+  const warning = '⚠ FAILED_PRECONDITION (code 400): User location is not supported for the API use.'
+  const result = await harness({ env: { ACP_RESPONSE_CHUNKS: JSON.stringify([warning]) } }).runResult()
+  assert.equal(result.stopReason, 'error')
+  assert.match(result.diagnostic, /User location is not supported/)
+})

@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { startTaskPermissions } from '../lib/task-permissions.js'
 import assert from 'node:assert/strict'
 import { Readable } from 'node:stream'
 import { MultiAgentTasks, runWithTaskTrace, registerAgentTasksTool } from '../task-monitor.js'
@@ -24,9 +25,9 @@ function harness(saved = new Map()) {
     tasks.bind(trace, 'child-original')
     return trace
   }
-  const post = async (args, origin = 'http://localhost:1234') => {
+  const post = async (args, origin = 'http://localhost:1234', headers = {}) => {
     const req = Readable.from([JSON.stringify(args)])
-    req.method = 'POST'; req.url = '/multi-agent/tasks'; req.headers = { origin, 'content-type': 'application/json' }
+    req.method = 'POST'; req.url = '/multi-agent/tasks'; req.headers = { origin, 'content-type': 'application/json', ...headers }
     const res = { writeHead(status) { this.status = status }, end(body) { this.body = JSON.parse(body) } }
     await tasks.handleHttp(req, res)
     return res
@@ -141,4 +142,82 @@ test('owner POST validates same origin, rejects wrong parent, and routes continu
   assert.equal(result.body.value.reusedSession, true)
   assert.equal(called, 1)
   assert.equal((await post({ action: 'continue', parentSessionId: 'other', childId: 'child-original', message: 'bad' })).status, 400)
+})
+
+test('panel permission changes are task-scoped, durable, and never grant a stale approval', async () => {
+  const { tasks, post, begin, state, ctx } = harness()
+  await tasks.ready
+  const trace = begin('kimi-code')
+  const sibling = tasks.begin({ parentSessionId: 'parent-a', agent: 'kimi-code', label: 'second', cwd: '/workspace' })
+  tasks.bind(sibling, 'sibling')
+  let answer
+  let pendingSignal
+  const options = {
+    agent: 'kimi-code', agentLabel: 'Kimi', parent: state.root, policy: 'human', launcher: () => 'acp',
+    ctx: { get: (name) => name === 'userQuestions' ? { ask: ({ signal }) => { pendingSignal = signal; return new Promise((resolve) => { answer = resolve }) } } : undefined },
+  }
+  const run = startTaskPermissions({ ...options, trace })
+  const otherRun = startTaskPermissions({ ...options, trace: sibling })
+  const args = { action: 'set-permission', childId: 'child-original', parentSessionId: 'parent-a', choice: 'reject' }
+  const pending = run.ask({ kindLabel: 'read' })
+  assert.equal((await post(args, 'https://untrusted.example')).status, 403)
+  assert.equal((await post({ ...args, parentSessionId: 'other' })).status, 400)
+  assert.equal((await post({ ...args, choice: 'arbitrary' })).status, 400)
+  assert.equal((await post({ ...args, choice: 'codex:never' })).status, 400)
+  state.rejection = 403
+  ctx.connection.requestRejection = () => state.rejection
+  assert.equal((await post(args)).status, 403)
+  state.rejection = undefined
+  assert.equal((await post(args)).body.value.permission.effective, 'reject')
+  assert.equal(pendingSignal.aborted, true)
+  answer({ answers: [{ selected: ['Allow once'] }] })
+  assert.equal((await pending).outcome, 'deny')
+  assert.equal((await run.ask({})).outcome, 'deny')
+  assert.equal(otherRun.view().selected, 'default')
+  assert.equal(otherRun.view().effective, 'human')
+  await assert.rejects(state.tools[0].execute(args, { agent: state.root }), /requires a childId/)
+  const restored = harness(state.saved)
+  await restored.tasks.ready
+  const record = restored.tasks.getRecord('parent-a', 'child-original')
+  assert.equal(record.permissionChoice, 'reject')
+  assert.equal(startTaskPermissions({ ...options, trace: record.trace }).policy, 'reject')
+  assert.equal((await post({ ...args, choice: 'default' })).body.value.permission.effective, 'human')
+  tasks.table.put = async () => { throw new Error('write failed') }
+  assert.equal((await post(args)).status, 400)
+  assert.equal(run.policy, 'human')
+})
+
+test('native panel changes only the verified child sandbox and restores its initial mode', async () => {
+  const { tasks, begin, state, post, ctx } = harness()
+  await tasks.ready
+  const trace = begin()
+  const events = []
+  let mode = 'read-only'
+  const child = { id: 'child-original', session: { id: 'child-original', header: { origin: 'subagent' },
+    append(name, data) { events.push(name); mode = data.mode } }, ctx: { get: () => ({ resolve: () => ({ mode }) }) } }
+  ctx.agents = { get: (id) => id === state.root.id ? state.root : child, list: () => [state.root, child] }
+  ctx.subagents = { rootOf: () => state.root, namesOf() {}, resolveName() {}, startActivation() {} }
+  const args = { action: 'set-permission', childId: trace.record.childId, parentSessionId: 'parent-a' }
+  assert.equal((await post({ ...args, choice: 'workspace-write' })).body.value.permission.effective, 'workspace-write')
+  assert.equal((await post({ ...args, choice: 'allow' })).status, 400)
+  assert.equal((await post({ ...args, choice: 'default' })).body.value.permission.effective, 'read-only')
+  assert.deepEqual(events, ['sandbox/mode', 'sandbox/mode'])
+  ctx.subagents.rootOf = () => child
+  assert.equal((await post({ ...args, choice: 'danger-full-access' })).status, 400)
+  assert.equal(mode, 'read-only')
+})
+
+
+test('Electron task actions require an authenticated proof for the same parent when the desktop forwarder drops Origin', async () => {
+  const { tasks, begin, post } = harness()
+  await tasks.ready
+  tasks.settle(begin(), { stopReason: 'completed' })
+  const response = { writeHead(status) { this.status = status }, end(body) { this.body = JSON.parse(body) } }
+  await tasks.handleHttp({ method: 'GET', url: '/multi-agent/tasks?parentSessionId=parent-a&view=action-proof', headers: { 'x-dsh-task-panel': '1' } }, response)
+  const headers = { origin: undefined, 'x-dsh-task-proof': response.body.value.proof }
+  const args = { action: 'restore', parentSessionId: 'parent-a', childId: 'child-original' }
+  assert.equal((await post(args, undefined, headers)).status, 200)
+  assert.equal((await post({ ...args, parentSessionId: 'other' }, undefined, headers)).status, 403)
+  assert.equal((await post(args, undefined, { origin: undefined })).status, 403)
+  assert.equal((await post(args, undefined, { ...headers, origin: 'https://untrusted.example' })).status, 403)
 })

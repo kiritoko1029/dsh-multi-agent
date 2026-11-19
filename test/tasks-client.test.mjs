@@ -1156,7 +1156,7 @@ test('selected tasks show full message and final output with compact collapsible
     ],
   })
   const { view, tree } = await renderTaskPanel(app)
-  const outputSection = nodes(tree, 'section').find((node) => text(nodes(node, 'h3')[0]) === 'Final output')
+  const outputSection = nodes(tree, 'section').find((node) => node.props.className === 'matasks-final-output')
   const outputText = nodes(outputSection).find((node) => node.props.className === 'matasks-markdown matasks-final-output-text')
   assert.equal(text(outputText).trim().replace(/\s+/g, ' '), longOutput.replace(/\s+/g, ' '))
   assert.equal(nodes(outputSection, 'details').length, 0)
@@ -1307,16 +1307,16 @@ test('tabs use stable newest-first ordering and real local creation times with e
   }
   const local = new Intl.DateTimeFormat(undefined, options).format(date)
   const full = new Intl.DateTimeFormat(undefined, { ...options, timeZoneName: 'long' }).format(date)
-  const tabTime = nodes(control(tree, 'task-tab-child-new-a'), 'time')[0]
+  const tab = control(tree, 'task-tab-child-new-a')
+  assert.ok(tab.props.title.includes(`Created ${full}`))
+  assert.equal(nodes(tab, 'time').length, 0)
   const header = nodes(workspace(tree), 'header')[0]
-  const headerTime = nodes(header, 'time')[0]
-  for (const timeNode of [tabTime, headerTime]) {
-    assert.ok(timeNode)
-    assert.equal(timeNode.props.dateTime, startedAt)
-    assert.notEqual(timeNode.props.dateTime, new Date(updatedAt).toISOString())
-    assert.equal(text(timeNode), local)
-    assert.equal(timeNode.props.title, `Created ${full}`)
-  }
+  const details = nodes(header, 'details').find((node) => node.props.className === 'matasks-run-details')
+  const timeNode = nodes(details, 'time')[0]
+  assert.equal(timeNode.props.dateTime, startedAt)
+  assert.notEqual(timeNode.props.dateTime, new Date(updatedAt).toISOString())
+  assert.equal(text(timeNode), local)
+  assert.equal(timeNode.props.title, `Created ${full}`)
   assert.match(full, /GMT|UTC|Time|标准时间|時間/)
   assert.ok(nodes(header, 'span').find((node) => node.props.className === 'matasks-duration'))
   assert.doesNotMatch(text(header), /Duration unavailable/)
@@ -1324,14 +1324,14 @@ test('tabs use stable newest-first ordering and real local creation times with e
   for (const childId of ['child-missing-a', 'child-missing-b']) {
     const tab = control(tree, `task-tab-${childId}`)
     assert.equal(nodes(tab, 'time').length, 0)
-    assert.equal(text(nodes(tab).find((node) => node.props.className === 'matasks-created')), 'Creation time unknown')
+    assert.match(tab.props.title, /Creation time unknown/)
   }
   control(tree, 'task-tab-child-missing-a').props.onClick()
   tree = await view.settle()
   const unknownHeader = nodes(workspace(tree), 'header')[0]
   assert.equal(nodes(unknownHeader, 'time').length, 0)
   assert.match(text(unknownHeader), /Creation time unknown/)
-  assert.match(text(unknownHeader), /Duration unavailable/)
+  assert.equal(nodes(unknownHeader).some((node) => node.props.className === 'matasks-duration'), false)
   assert.equal(app.dictionaries[0][1].zh['tasks.createdUnknown'], '创建时间未知')
   view.dispose()
   app.dispose()
@@ -2025,7 +2025,7 @@ test('task tabs, workspace badges and completion cards use Codex, Kimi Code and 
     return tasks.find((task) => task.childId === childId)
   }, tasks)
   const { view, tree } = await renderTaskPanel(app)
-  const tabLabels = byRole(tree, 'tab').map((tab) => text(nodes(tab, 'span').find((node) => node.props.className === 'matasks-tab-provider')))
+  const tabLabels = byRole(tree, 'tab').map((tab) => tab.props['aria-label'].split(' · ')[1])
   assert.deepEqual(tabLabels, ['Antigravity (agy)', 'Kimi Code', 'Codex'])
   assert.ok(nodes(workspace(tree), 'span').some((node) => node.props.className === 'matasks-badge' && text(node) === 'Antigravity (agy)'))
 
@@ -2471,7 +2471,8 @@ test('clear, restore, and history action buttons start their accessible name wit
   const workspaceClear = control(tree, 'clear-active-done')
   assert.ok(workspaceClear)
   const workspaceVisible = text(workspaceClear).trim()
-  assert.equal(workspaceVisible, 'Clear panel record')
+  assert.equal(workspaceVisible, '')
+  assert.match(accessibleNameOf(workspaceClear), /Clear panel record: Active completed task/)
   assert.ok(accessibleNameOf(workspaceClear).startsWith(workspaceVisible), `accessible name "${accessibleNameOf(workspaceClear)}" must start with visible label "${workspaceVisible}"`)
   assert.match(workspaceClear.props.title, /Clear only removes this panel record/)
 
@@ -2481,7 +2482,7 @@ test('clear, restore, and history action buttons start their accessible name wit
 
   const batchClear = control(tree, 'clear-history')
   assert.ok(batchClear)
-  assert.equal(text(batchClear).trim(), 'Clear archived history')
+  assert.equal(text(batchClear).trim(), '')
   assert.ok(accessibleNameOf(batchClear).startsWith('Clear archived history'))
   const noteId = batchClear.props['aria-describedby']
   assert.ok(noteId, 'batch clear must reference supplemental description via aria-describedby')
@@ -2498,7 +2499,8 @@ test('clear, restore, and history action buttons start their accessible name wit
     for (const btn of [viewBtn, restoreBtn, clearBtn]) {
       const visibleLabel = text(btn).trim()
       const accName = accessibleNameOf(btn)
-      assert.ok(visibleLabel.length > 0)
+      if (btn === viewBtn) assert.equal(visibleLabel, label)
+      else { assert.ok(nodes(btn, 'svg').length); assert.ok(btn.props.title) }
       assert.ok(accName.startsWith(visibleLabel), `${btn.props.name} accessible name "${accName}" must start with "${visibleLabel}"`)
       assert.ok(accName.includes(label), `${btn.props.name} accessible name "${accName}" must include "${label}"`)
     }
@@ -2691,6 +2693,33 @@ test('task controls use dedicated --ma-control-border and session metadata popov
   assert.equal(resolvedPopoverWidth, 260)
   assert.ok(resolvedPopoverWidth <= containingOverviewWidth, 'popover must never exceed narrow sidebar containing block')
 
+  view.dispose()
+  app.dispose()
+})
+
+test('permission form posts only the selected task policy and displays the Host effective and deferred states', async () => {
+  const task = { ...summary, permission: { kind: 'external', editable: true, choices: ['default', 'reject', 'subagent:full-access'],
+    selected: 'default', defaultChoice: 'reject', effective: 'reject', launcher: 'ask-request' } }
+  const app = setup({ fetch: async (url, init = {}) => {
+    if (init.method === 'POST') {
+      const body = JSON.parse(init.body)
+      assert.deepEqual(body, { parentSessionId: 'parent-1', childId: 'child-1', action: 'set-permission', choice: 'subagent:full-access' })
+      task.permission = { ...task.permission, selected: body.choice, pending: true }
+      return jsonResponse({ ok: true, value: { permission: task.permission } })
+    }
+    return jsonResponse({ ok: true, value: url.includes('childId=') ? { task } : { revision: 1, tasks: [task] } })
+  } })
+  const { view } = await renderTaskPanel(app)
+  const panel = () => nodes(view.tree, 'details').find((node) => node.props.className.includes('matasks-permissions'))
+  nodes(panel(), 'select')[0].props.onChange({ currentTarget: { value: 'subagent:full-access' } })
+  view.render()
+  await nodes(panel(), 'form')[0].props.onSubmit({ preventDefault() {} })
+  await view.settle()
+  assert.match(text(panel()), /Currently effective: Deny all requests/)
+  assert.match(text(nodes(panel(), 'summary')[0]), /Applies on next continuation/)
+  assert.match(nodes(panel(), 'summary')[0].props.title, /Earlier grants/)
+  assert.doesNotMatch(text(panel()), /Earlier grants/)
+  assert.equal(nodes(panel(), 'select')[0].props.value, 'subagent:full-access')
   view.dispose()
   app.dispose()
 })

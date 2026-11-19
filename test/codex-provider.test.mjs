@@ -507,7 +507,7 @@ async function vendoredPermissionRun(values) {
     disposeGraceMs: { get: () => 1000 },
   }
   apply(ctx, config)
-  const run = await runWithTaskTrace(undefined, () => provider.start({
+  const run = await runWithTaskTrace(values.trace, () => provider.start({
     cwd: process.cwd(),
     prompt: [{ type: 'text', text: 'Protocol observation only.' }],
     signal: AbortSignal.timeout(10000),
@@ -665,4 +665,24 @@ test('without interactive services the vendored path denies fail-closed', async 
     env: { CODEX_ASK_APPROVAL: 'command' },
   })
   assert.deepEqual(observed.requests.approval, { decision: 'decline' })
+})
+
+test('Codex task override uses the matching thread mode and stages incompatible changes until the next start', async () => {
+  const trace = { record: { agent: 'codex', permissionChoice: 'reject' } }
+  const values = { trace, permissionPolicy: 'subagent', subagentPermissionMode: 'full-access', env: { CODEX_ASK_APPROVAL: 'command' } }
+  const first = await vendoredPermissionRun(values)
+  assert.equal(first.requests.thread.sandbox, 'workspace-write')
+  assert.equal(first.requests.approval.decision, 'decline')
+  trace.permissions.select('allow')
+  assert.equal((await trace.permissions.ask({})).outcome, 'allow')
+  trace.permissions.select('default')
+  assert.equal(trace.permissions.view().pending, true)
+  assert.equal(trace.permissions.view().effective, 'allow')
+  trace.record.permissionChoice = 'default'
+  const resumed = await vendoredPermissionRun(values)
+  assert.equal(resumed.requests.thread.sandbox, 'danger-full-access')
+  trace.record.permissionChoice = 'codex:approve-for-me'
+  assert.equal((await vendoredPermissionRun(values)).requests.thread.approvalsReviewer, 'auto_review')
+  trace.record.permissionChoice = 'codex:never'
+  assert.equal((await vendoredPermissionRun(values)).requests.thread.approvalPolicy, 'never')
 })

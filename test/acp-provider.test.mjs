@@ -640,3 +640,11 @@ test('missing interactive services deny asks fail-closed', async () => {
   const { requests } = await agent.run()
   assert.deepEqual(permissionEntry(requests), { outcome: { outcome: 'selected', optionId: 'reject-once' } })
 })
+
+test('Kimi applies the saved task policy without changing other runs of the same provider', async () => {
+  const agent = harness(undefined, undefined, { ACP_ASK_PERMISSION: '1' }, { kimiCode: true }, { permission: 'reject' })
+  const { requests } = await agent.run({ record: { agent: 'kimi-code', permissionChoice: 'allow' } })
+  assert.equal(permissionEntry(requests).outcome.optionId, 'allow-once')
+  const other = await agent.run({ record: { agent: 'kimi-code' } })
+  assert.equal(permissionEntry(other.requests).outcome.optionId, 'reject-once')
+})

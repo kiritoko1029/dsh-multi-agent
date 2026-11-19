@@ -1,10 +1,11 @@
+import { startTaskPermissions } from './lib/task-permissions.js'
 import { randomUUID } from 'node:crypto'
 import { Readable, Writable } from 'node:stream'
 import { PROTOCOL_VERSION, client, methods, ndJsonStream } from '@agentclientprotocol/sdk'
 import z from '@deepseek-ai/schemastery'
 import { currentTaskTrace } from './task-monitor.js'
 import { currentValue, dynamicAcpConfig } from './lib/config.js'
-import { createPermissionAsker, normalizePermissionPolicy, normalizeSubagentPermissionMode, PERMISSION_POLICIES, resolveMainSessionFullAccess, SUBAGENT_PERMISSION_MODES } from './lib/permission-policy.js'
+import { PERMISSION_POLICIES, SUBAGENT_PERMISSION_MODES } from './lib/permission-policy.js'
 import { kimiCatalogFromOutput, registerModelCatalogRoute, runCatalogCommand } from './lib/model-catalog-route.js'
 import { sameDirectory } from './lib/path-compat.js'
 import { assertDirectCommand, commandEnvironment, hasEnvironmentKey } from './lib/process-command.js'
@@ -425,6 +426,7 @@ async function startAcpRun(request, spec) {
     if (update.sessionUpdate === 'agent_message_chunk') fold.pushText(acpContentText(update.content))
     return Promise.resolve()
   }).onRequest(methods.client.session.requestPermission, async ({ params }) => {
+    if (!collecting || params.sessionId !== sessionId || flags.cancelled) return { outcome: { outcome: 'cancelled' } }
     const request = permissionKindLabel(params.toolCall)
     const permissionTitle = typeof params.toolCall?.title === 'string' && params.toolCall.title ? params.toolCall.title : undefined
     const permissionDetail = acpPermissionSummary(params)
@@ -450,6 +452,7 @@ async function startAcpRun(request, spec) {
       // The asker itself failed; fail closed with a completed activity.
       decision = { outcome: 'deny', scope: 'once', source: 'asker-error' }
     }
+    if (!collecting || params.sessionId !== sessionId || flags.cancelled) return { outcome: { outcome: 'cancelled' } }
     if (decision.outcome === 'allow') {
       // A one-shot approval must never widen into a persistent grant: only
       // allow_always (when the child offers it AND the decision asked for a
@@ -610,14 +613,15 @@ async function startAcpRun(request, spec) {
           const output = collectOutput()
           // agy can report native execution failure as ordinary text + end_turn.
           // Limit the fallback to its entire fixed warning, preserving other replies.
-          const agyExecutionFailed = spec.agent === 'agy' && promptResult.stopReason === 'end_turn'
-            && output.length === 1 && output[0].type === 'text'
-            && /^\s*(?:⚠\uFE0F?\s*)?Agent execution terminated due to error\.\s*$/u.test(output[0].text)
+          const warning = spec.agent === 'agy' && promptResult.stopReason === 'end_turn' && output.length === 1 && output[0].type === 'text'
+            ? output[0].text.trim().replace(/^⚠\uFE0F?\s*/u, '') : ''
+          const agyExecutionFailed = warning === 'Agent execution terminated due to error.'
+            || warning === 'FAILED_PRECONDITION (code 400): User location is not supported for the API use.'
           const stopReason = agyExecutionFailed ? 'error' : acpStopReason(promptResult.stopReason)
           const usage = acpUsage(promptResult.usage)
           if (usage) tasks?.setTelemetry?.({ usage, usageScope: 'session' })
           diagnostic = agyExecutionFailed
-            ? 'Antigravity (agy) native execution failed: Agent execution terminated due to error. (Detected from warning-only output; ACP stop reason: end_turn.) See native agy logs for the underlying error.'
+            ? `Antigravity (agy) native execution failed: ${warning} (Detected from warning-only output; ACP stop reason: end_turn.) See native agy logs for the underlying error.`
             : terminalFailure(promptResult.stopReason, latestPermission)
           return {
             output,
@@ -637,6 +641,8 @@ async function startAcpRun(request, spec) {
             }, latestPermission)
           }
           throw processFailure ?? error
+        } finally {
+          collecting = false
         }
       },
       collectOutput,
@@ -686,6 +692,7 @@ export class AcpProvider {
     this.ctx = ctx
     this.config = config
     this.dialect = dialect
+    this.taskPermissionAgent = dialect.agent
   }
 
   start(request) {
@@ -702,38 +709,23 @@ export class AcpProvider {
       this.ctx.logger.warn(`subagent-acp "${this.name}": child start failed: %o`, error)
       throw failure
     }
-    const permissionPolicy = normalizePermissionPolicy(currentValue(this.config.permission))
-    const subagentPermissionMode = normalizeSubagentPermissionMode(currentValue(this.config.subagentPermissionMode))
-    const mainSessionFullAccess = permissionPolicy === 'main-session'
-      && resolveMainSessionFullAccess(this.ctx, request.parent)
-    const askPermission = createPermissionAsker({
-      ctx: this.ctx,
-      parent: request.parent,
-      policy: permissionPolicy,
-      subagentMode: subagentPermissionMode,
-      backend: 'acp',
-      agentLabel: this.dialect.label,
-      language: trace?.record?.language,
-      signal: request.signal,
-      mainSessionFullAccess,
+    const flag = this.dialect.bypassFlag
+    const args = this.config.args ?? []
+    const permissions = startTaskPermissions({
+      trace, agent: this.dialect.agent, ctx: this.ctx, parent: request.parent, signal: request.signal,
+      agentLabel: this.dialect.label, policy: currentValue(this.config.permission),
+      subagentMode: currentValue(this.config.subagentPermissionMode),
+      launcher: (policy, mode, fullAccess, choice) => flag && (fullAccess || (policy === 'subagent' && mode === 'full-access') || (choice === 'default' && args.includes(flag)))
+        ? 'acp-bypass' : 'acp',
     })
-    // The agy CLI exposes a native full-access bypass; kimi acp documents no
-    // startup flag, so its full-access level is realized by granting every
-    // ask instead. The same backend treatment applies to an explicitly
-    // configured subagent full access and an inherited native full preset.
-    const bypassArgs = this.dialect.bypassFlag !== undefined
-      && (mainSessionFullAccess
-        || (permissionPolicy === 'subagent' && subagentPermissionMode === 'full-access'))
-      && !(this.config.args ?? []).includes(this.dialect.bypassFlag)
-      ? [this.dialect.bypassFlag]
-      : []
+    const launchArgs = flag ? args.filter((arg) => arg !== flag) : args
     return startAcpRun(request, {
       agent: this.dialect.agent,
       command: this.config.command,
-      args: [...(this.config.args ?? []), ...bypassArgs],
+      args: permissions.launcher === 'acp-bypass' ? [...launchArgs, flag] : launchArgs,
       cwd,
-      permission: permissionPolicy,
-      askPermission,
+      get permission() { return permissions.policy },
+      askPermission: permissions.ask,
       env: this.config.env,
       model: this.config.model,
       reasoningEffort: this.config.reasoningEffort,

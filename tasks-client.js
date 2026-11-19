@@ -36,6 +36,8 @@ window.__ModuleLoader__.load({
         'tasks.mainSession': 'Main session',
         'tasks.childSession': 'Child task',
         'tasks.sessionMetadata': 'Session metadata',
+        'tasks.runDetails': 'Run details',
+        'perm.offline': 'Offline',
         'tasks.refresh': 'Refresh tasks',
         'tasks.loading': 'Loading task history…',
         'tasks.empty': 'No monitored tasks have been recorded for this main session.',
@@ -87,10 +89,40 @@ window.__ModuleLoader__.load({
         'tasks.clear': 'Clear panel record',
         'tasks.clearHistory': 'Clear archived history',
         'tasks.actionFailed': 'The task action failed. Try again.',
-        'tasks.continue': 'Continue directing this task',
+        'tasks.continue': 'Continue task',
         'tasks.continueMessage': 'Follow-up message',
         'tasks.continuePlaceholder': 'Describe the next instruction for this settled task…',
         'tasks.continueSubmit': 'Send continuation',
+        'perm.title': 'Task permissions',
+        'perm.selection': 'Permission for this task',
+        'perm.save': 'Apply',
+        'perm.default': 'Use provider default',
+        'perm.nativeDefault': 'Restore initial sandbox',
+        'perm.effective': 'Currently effective: {value}',
+        'perm.pending': 'Applies on next continuation',
+        'perm.next': 'Applies when this task resumes.',
+        'perm.nativeOffline': 'The native sandbox can be changed while the DSH child session is live.',
+        'perm.nativeHint': 'Changes apply to the next file or command operation. DSH manages approval separately.',
+        'perm.externalHint': 'Changes apply to new approval requests. A different process or thread mode takes effect on continuation. Earlier grants and running operations keep their scope.',
+        'perm.main-session': 'Main session approval',
+        'perm.inheritedFull': 'Inherited full access',
+        'perm.human': 'Ask me',
+        'perm.allow': 'Allow all requests',
+        'perm.reject': 'Deny all requests',
+        'perm.subagent:auto': 'Follow native Codex mode',
+        'perm.acpAuto': 'Agent-managed · allow ACP requests once',
+        'perm.codex:never': 'Codex · never ask',
+        'perm.codex:approve-for-me': 'Codex · automatic review',
+        'perm.subagent:ask-request': 'Agent-managed · ask',
+        'perm.subagent:full-access': 'Agent-managed · full access',
+        'perm.read-only': 'Read only',
+        'perm.workspace-write': 'Workspace write',
+        'perm.danger-full-access': 'Full filesystem access',
+        'perm.launcher.ask-request': 'Workspace write · ask on escalation',
+        'perm.launcher.approve-for-me': 'Workspace write · automatic review',
+        'perm.launcher.never': 'No approval prompts',
+        'perm.launcher.dangerously-bypass-approvals-and-sandbox': 'Full access · approvals bypassed',
+        'perm.launcher.acp-bypass': 'Native permission checks bypassed',
         'tasks.continueUnavailable': 'This settled task cannot be continued.',
         'tasks.continueAccepted': 'Continuation accepted by the Host; model work is not finished.',
         'tasks.continuationCount': '{count} continuations',
@@ -118,6 +150,8 @@ window.__ModuleLoader__.load({
         'tasks.mainSession': '主会话',
         'tasks.childSession': '子任务',
         'tasks.sessionMetadata': '会话元数据',
+        'tasks.runDetails': '运行详情',
+        'perm.offline': '离线',
         'tasks.refresh': '刷新任务',
         'tasks.loading': '正在读取任务历史…',
         'tasks.empty': '此主会话尚无已监控的任务记录。',
@@ -169,10 +203,40 @@ window.__ModuleLoader__.load({
         'tasks.clear': '清理面板记录',
         'tasks.clearHistory': '清理已归档历史',
         'tasks.actionFailed': '任务操作失败，请重试。',
-        'tasks.continue': '继续指挥此任务',
+        'tasks.continue': '继续任务',
         'tasks.continueMessage': '后续指令',
         'tasks.continuePlaceholder': '输入要让此终态任务继续完成的指令…',
         'tasks.continueSubmit': '发送继续指令',
+        'perm.title': '任务权限',
+        'perm.selection': '本任务权限',
+        'perm.save': '应用',
+        'perm.default': '使用设置中的默认值',
+        'perm.nativeDefault': '恢复初始沙箱',
+        'perm.effective': '当前生效：{value}',
+        'perm.pending': '下次续接生效',
+        'perm.next': '下次续接此任务时生效。',
+        'perm.nativeOffline': 'DSH 子会话在线时可调整文件沙箱。',
+        'perm.nativeHint': '从下一次文件或命令操作起生效，审批仍由 DSH 管理。',
+        'perm.externalHint': '审批策略作用于后续请求。需要切换进程或线程模式时，在续接后生效。已有授权和正在执行的操作保留原权限。',
+        'perm.main-session': '主会话审批',
+        'perm.inheritedFull': '继承主会话完全权限',
+        'perm.human': '人工审批',
+        'perm.allow': '允许所有请求',
+        'perm.reject': '拒绝所有请求',
+        'perm.subagent:auto': '沿用 Codex 原生线程模式',
+        'perm.acpAuto': '子代理控制 · ACP 请求单次放行',
+        'perm.codex:never': 'Codex · 不请求审批',
+        'perm.codex:approve-for-me': 'Codex · 自动审查',
+        'perm.subagent:ask-request': '子代理控制 · 逐项审批',
+        'perm.subagent:full-access': '子代理控制 · 完全权限',
+        'perm.read-only': '只读',
+        'perm.workspace-write': '工作区可写',
+        'perm.danger-full-access': '完整文件访问',
+        'perm.launcher.ask-request': '工作区可写 · 升级时送审',
+        'perm.launcher.approve-for-me': '工作区可写 · 自动审查',
+        'perm.launcher.never': '不请求审批',
+        'perm.launcher.dangerously-bypass-approvals-and-sandbox': '完全权限 · 跳过审批',
+        'perm.launcher.acp-bypass': '已跳过 CLI 原生审批',
         'tasks.continueUnavailable': '此终态任务不支持继续指挥。',
         'tasks.continueAccepted': 'Host 已接受继续指令；模型工作尚未完成。',
         'tasks.continuationCount': '已继续 {count} 次',
@@ -197,13 +261,14 @@ window.__ModuleLoader__.load({
     const CSS = `
 .matasks{box-sizing:border-box;display:grid;gap:14px;min-width:0;padding:14px;color:var(--ma-text);font-size:13px;line-height:1.55}
 .matasks *{box-sizing:border-box}
-.matasks-panel{display:flex;flex-direction:column;flex:1 1 auto;align-items:stretch;justify-content:flex-start;gap:10px;width:100%;height:100%;min-height:0;padding:10px;overflow:hidden;background:var(--ma-bg)}
+.matasks-panel{display:flex;flex-direction:column;flex:1 1 auto;align-items:stretch;justify-content:flex-start;gap:5px;width:100%;height:100%;min-height:0;padding:6px;overflow:hidden;background:var(--ma-bg);container-type:inline-size}
 .matasks-panel>*{flex:0 0 auto}
 .matasks-panel>.matasks-workspace,.matasks-panel>.matasks-task-history{flex:1 1 auto;min-height:0}
 .matasks h2,.matasks h3,.matasks p{margin:0}
 .matasks h2{font-size:15px;font-weight:650;line-height:1.35;letter-spacing:-.01em;color:var(--ma-text)}
 .matasks h3{font-size:11.5px;font-weight:650;letter-spacing:.025em;text-transform:uppercase;color:var(--ma-muted)}
-.matasks-overview{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;padding:4px 6px 4px 12px;border:1px solid var(--ma-line);border-radius:11px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.matasks-overview{display:flex;align-items:center;justify-content:space-between;position:relative;gap:6px;min-width:0;min-height:30px;padding:0 2px}
+.matasks-heading[hidden]{display:none}
 .matasks-heading{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;white-space:nowrap}
 .matasks-heading h2{flex:0 0 auto;font-size:13.5px}
 .matasks-overview-count{display:inline-flex;align-items:center;min-width:0;padding:1px 8px;border:1px solid var(--ma-line);border-radius:999px;background:var(--ma-surface-sunken);overflow:hidden;text-overflow:ellipsis;color:var(--ma-muted);font-size:11px;font-weight:550;font-variant-numeric:tabular-nums}
@@ -231,15 +296,12 @@ window.__ModuleLoader__.load({
 .matasks-session-meta dt{font-weight:600;color:var(--ma-muted)}
 .matasks-session-meta dd{min-width:0;margin:0;overflow-wrap:anywhere;color:var(--ma-text)}
 .matasks-session-meta dd code{display:inline-block;padding:1px 6px;border-radius:5px;background:var(--ma-surface-sunken);border:1px solid var(--ma-line)}
-.matasks-tabs{display:flex;flex-wrap:wrap;gap:6px;max-width:100%;max-height:26%;padding:4px;overflow:auto;border:1px solid var(--ma-line);border-radius:11px;background:var(--ma-surface-sunken)}
-.matasks-tab{justify-content:space-between!important;align-items:flex-start!important;gap:8px!important;min-width:0;max-width:252px;min-height:46px!important;padding:7px 10px!important;text-align:left;border-radius:8px!important;border-color:var(--ma-line)!important;background:var(--ma-surface)!important;box-shadow:var(--ma-shadow-sm)}
-.matasks-tab:hover:not(:disabled){border-color:var(--ma-line-strong)!important;background:var(--ma-surface-raised)!important}
-.matasks-tab[aria-selected=true]{border-color:var(--ma-accent)!important;background:var(--ma-accent-soft)!important;color:var(--ma-accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ma-accent) 20%,transparent)}
-.matasks-tab[aria-selected=true] .matasks-tab-provider,.matasks-tab[aria-selected=true] .matasks-tab-label{color:var(--ma-accent)}
-.matasks-tab-copy{display:grid;gap:2px;min-width:0;line-height:1.3}
-.matasks-tab-provider{color:var(--ma-muted);font-size:10.5px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;overflow-wrap:anywhere}
-.matasks-tab-label{font-weight:620;color:var(--ma-text);overflow-wrap:anywhere}
-.matasks-tab .matasks-status{margin-left:2px;flex:0 0 auto}
+.matasks-tabs{display:flex;align-items:center;flex:1 1 0;min-width:0;gap:3px;padding:3px;overflow-x:auto;scrollbar-width:thin}
+.matasks-tabs .matasks-tab{flex:0 0 auto;max-width:min(190px,90%);min-height:28px;gap:5px;padding:3px 8px;border-color:transparent;border-radius:6px;background:transparent;box-shadow:none}
+.matasks-tabs .matasks-tab[aria-selected=true]{background:var(--ma-accent-soft);border-color:var(--ma-accent);color:var(--ma-accent)}
+.matasks-tab-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.matasks-tab .matasks-status{width:7px;height:7px;display:inline-flex;flex:none;overflow:hidden;gap:0;padding:0;border:0;background:transparent}
+.matasks-tab .matasks-status::before{width:7px;height:7px}
 .matasks-badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .matasks-badge{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--ma-line-strong);border-radius:999px;background:var(--ma-surface-raised);color:var(--ma-muted);font-size:11px;font-weight:540;line-height:1.35;white-space:nowrap}
 .matasks-status{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:999px;background:color-mix(in srgb,currentColor 10%,transparent);color:var(--ma-idle);font-size:11px;font-weight:560;line-height:1.35;white-space:nowrap}
@@ -249,24 +311,35 @@ window.__ModuleLoader__.load({
 .matasks-status[data-tone=error]{color:var(--ma-error)}
 .matasks-status[data-tone=warn]{color:var(--ma-warn)}
 .matasks-workspace{display:flex;flex-direction:column;align-items:stretch;width:100%;min-width:0;overflow:hidden;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
-.matasks-task-head{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 14px;padding:12px 14px;border-bottom:1px solid var(--ma-line);background:color-mix(in srgb,var(--ma-surface) 92%,var(--ma-bg));backdrop-filter:blur(8px)}
-.matasks-task-title{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
+.matasks-task-head{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;row-gap:1px;padding:5px 10px;border-bottom:1px solid var(--ma-line);background:var(--ma-surface)}
+.matasks-task-title{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;min-width:0}
+.matasks-task-title .matasks-badge{padding:0;border:0;background:transparent;color:var(--ma-text);font-size:12px;font-weight:620}
+.matasks-run-details{grid-column:1/-1;min-width:0;color:var(--ma-muted);font-size:12px}
+.matasks-run-details>summary,.matasks-continue>summary{cursor:pointer;list-style:none}
+.matasks-run-details>summary::-webkit-details-marker,.matasks-continue>summary::-webkit-details-marker{display:none}
+.matasks-run-details>summary::before,.matasks-continue>summary::before{content:'';display:inline-block;width:5px;height:5px;margin:0 7px 2px 1px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg)}
+.matasks-run-details[open]>summary::before,.matasks-continue[open]>summary::before{transform:rotate(45deg)}
+.matasks-run-details>summary{width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:24px}
+.matasks-run-details[open]{padding-bottom:4px}
 .matasks-label{font-size:13.5px;font-weight:650;color:var(--ma-text);overflow-wrap:anywhere}
 .matasks-duration{color:var(--ma-muted);font-size:11.5px;font-weight:550;font-variant-numeric:tabular-nums}
 .matasks-created{color:var(--ma-muted);font-size:11px;font-weight:450;font-variant-numeric:tabular-nums}
-.matasks-task-timing{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:3px}
-.matasks-telemetry{display:flex;flex-wrap:wrap;gap:5px 6px;min-width:0;margin-top:7px;color:var(--ma-muted);font-size:11px;line-height:1.4}
-.matasks-telemetry>span{display:inline-flex;align-items:center;min-width:0;padding:2px 7px;border:1px solid var(--ma-line);border-radius:6px;background:var(--ma-surface-sunken);overflow-wrap:anywhere}
+.matasks-task-timing{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:2px 0}
+.matasks-telemetry{display:flex;flex-wrap:wrap;gap:3px 10px;min-width:0;margin:2px 0;color:var(--ma-muted);font-size:11px;line-height:1.4}
+.matasks-telemetry>span{display:inline-flex;align-items:center;min-width:0;overflow-wrap:anywhere}
 .matasks-token-usage{font-variant-numeric:tabular-nums}
 .matasks-actions{display:flex;flex-wrap:wrap;gap:8px;padding-top:11px}
-.matasks-task-head .matasks-actions{padding-top:0}
+.matasks-task-head .matasks-actions,.matasks-history-actions{display:flex;align-items:center;gap:2px;padding:0}
+.matasks-task-head .matasks-actions button,.matasks-history-actions button{width:28px;height:28px;min-height:28px;padding:4px;border-color:transparent;background:transparent;box-shadow:none}
+.matasks-task-head button:hover:not(:disabled),.matasks-history-actions button:hover:not(:disabled){background:var(--ma-hover);border-color:var(--ma-line)}
 .matasks-activity-frame{position:relative;display:flex;flex:1 1 auto;min-width:0;min-height:0}
-.matasks-activity-viewport{flex:1 1 auto;width:100%;min-width:0;min-height:0;padding:12px 14px 16px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto;background:var(--ma-bg)}
-.matasks-activity-content{display:grid;align-content:start;gap:12px;min-width:0}
+.matasks-activity-viewport{flex:1 1 auto;width:100%;min-width:0;min-height:0;padding:8px 10px 12px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto;background:var(--ma-bg)}
+.matasks-activity-content{display:grid;align-content:start;gap:8px;min-width:0}
 .matasks-activity-content>section{display:grid;gap:8px;min-width:0}
-.matasks-timeline{display:grid;gap:10px;min-width:0}
+.matasks-timeline{display:grid;gap:6px;min-width:0}
 .matasks-message,.matasks-final-output-text{min-width:0;overflow-wrap:anywhere}
-.matasks-message{padding:11px 13px;border:1px solid var(--ma-line);border-radius:10px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
+.matasks-message{padding:3px 1px;background:transparent}
+.matasks-message+.matasks-message{padding-top:8px;border-top:1px solid var(--ma-line)}
 .matasks-markdown{line-height:1.65}
 .matasks-markdown h1,.matasks-markdown h2,.matasks-markdown h3,.matasks-markdown h4,.matasks-markdown h5,.matasks-markdown h6{margin:12px 0 6px;font-weight:650;line-height:1.4;letter-spacing:normal;text-transform:none;color:var(--ma-text)}
 .matasks-markdown h1{font-size:1.45em}.matasks-markdown h2{font-size:1.25em}.matasks-markdown h3{font-size:1.12em}.matasks-markdown h4,.matasks-markdown h5,.matasks-markdown h6{font-size:1em}
@@ -287,7 +360,7 @@ window.__ModuleLoader__.load({
 .matasks-final-output>h3{color:var(--ma-accent)}
 .matasks pre{max-width:100%;margin:6px 0 0;padding:10px 12px;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--ma-line);border-radius:8px;background:var(--ma-surface-sunken);color:var(--ma-text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.5}
 .matasks-output{max-height:none;overflow:visible}
-.matasks-tool-activity{min-width:0;padding:8px 11px;border:1px solid var(--ma-line);border-radius:10px;background:var(--ma-surface-sunken);color:var(--ma-muted);transition:border-color 180ms ease,background-color 180ms ease}
+.matasks-tool-activity{min-width:0;padding:5px 8px;border:1px solid var(--ma-line);border-radius:10px;background:var(--ma-surface-sunken);color:var(--ma-muted);transition:border-color 180ms ease,background-color 180ms ease}
 .matasks-tool-activity[open]{border-color:var(--ma-line-strong);background:var(--ma-surface)}
 .matasks-tool-activity>summary{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:560;color:var(--ma-text);cursor:pointer;list-style:none}
 .matasks-tool-activity>summary::-webkit-details-marker,.matasks-tool-detail>summary::-webkit-details-marker{display:none}
@@ -303,21 +376,29 @@ window.__ModuleLoader__.load({
 .matasks-jump-latest{position:absolute;right:14px;bottom:14px;z-index:3;width:34px;min-height:34px!important;padding:7px!important;border-radius:50%!important;border-color:var(--ma-line-strong)!important;background:var(--ma-overlay)!important;box-shadow:var(--ma-shadow)}
 .matasks-history{margin-bottom:2px}
 .matasks-task-history{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--ma-line);border-radius:12px;background:var(--ma-surface);box-shadow:var(--ma-shadow-sm)}
-.matasks-history-heading{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--ma-line);background:var(--ma-surface-raised)}
-.matasks-history-body{display:grid;flex:1 1 auto;min-height:0;align-content:start;gap:10px;padding:12px 14px;overflow-y:auto}
+.matasks-history-heading{position:relative;display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:5px 9px;border-bottom:1px solid var(--ma-line);background:var(--ma-surface-raised)}
+.matasks-history-body{display:grid;flex:1 1 auto;min-height:0;align-content:start;gap:5px;padding:5px 8px;overflow-y:auto}
 .matasks-view-actions{display:flex;flex-wrap:wrap;gap:6px}
-.matasks-history-list{display:grid;gap:8px;list-style:none;margin:0;padding:0}
-.matasks-history-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;min-width:0;padding:9px 11px;border:1px solid var(--ma-line);border-radius:9px;background:var(--ma-bg);transition:border-color 180ms ease,background-color 180ms ease}
-.matasks-history-row:hover{border-color:var(--ma-line-strong);background:var(--ma-surface-raised)}
-.matasks-history-row[data-selected=true]{border-color:var(--ma-accent);background:var(--ma-accent-soft)}
-.matasks-history-main{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}
-.matasks-history-actions{display:flex;flex-wrap:wrap;gap:6px}
-.matasks-history-actions button{min-height:28px;padding:3px 9px;font-size:12px}
-.matasks-continue{padding:11px 14px;border-top:1px solid var(--ma-line);background:var(--ma-surface)}
-.matasks-continue>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:620;color:var(--ma-text)}
+.matasks-history-list{display:grid;list-style:none;margin:0;padding:0}
+.matasks-history-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0;padding:5px 2px;border-bottom:1px solid var(--ma-line)}
+.matasks-history-row:last-child{border-bottom:0}
+.matasks-history-row[data-selected=true]{background:var(--ma-accent-soft)}
+.matasks-history-main{display:grid;justify-items:start;min-width:0}
+.matasks-history-main .matasks-history-link{display:block;width:100%;min-height:24px;padding:0;border:0;background:transparent;color:var(--ma-text);font-weight:600;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.matasks-history-meta{font-size:11px;color:var(--ma-muted);overflow-wrap:anywhere}
+.matasks-continue{padding:3px 10px;border-top:1px solid var(--ma-line);background:var(--ma-surface)}
+.matasks-continue>summary{padding:3px 0;line-height:20px;font-weight:600;color:var(--ma-text)}
+.matasks-permissions{border-top:0;border-bottom:1px solid var(--ma-line)}
+.matasks-permission-current,.matasks-permission-pending{margin-inline-start:8px;font-size:12px;font-weight:450;overflow-wrap:anywhere}
+.matasks-permission-current,.matasks-permission-offline{color:var(--ma-muted)}
+.matasks-permission-pending{color:var(--ma-warn);font-weight:600}
+.matasks-permission-offline{display:inline-grid;place-items:center;width:24px;height:28px;cursor:help}
+.matasks-permissions form{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:2px 0 5px}
+.matasks-permissions select{max-width:100%;min-width:0;min-height:28px;padding:2px 6px}
+.matasks-permissions button{min-height:28px;padding:2px 8px}
 .matasks-continue-form{display:grid;gap:8px;padding-top:10px}
 .matasks-continue-form label{font-size:12px;font-weight:560;color:var(--ma-muted)}
-.matasks-continue-form textarea{width:100%;min-height:76px;resize:vertical;padding:8px 10px;line-height:1.5}
+.matasks-continue-form textarea{width:100%;min-height:52px;resize:vertical;padding:8px 10px;line-height:1.5}
 .matasks-continue-form button{justify-self:start;border-color:var(--ma-accent-fill);background:var(--ma-accent-fill);color:var(--ma-on-accent);font-weight:600}
 .matasks-continue-form button:hover:not(:disabled){background:color-mix(in srgb,var(--ma-accent-fill) 90%,var(--ma-text));border-color:var(--ma-accent-fill);color:var(--ma-on-accent)}
 .matasks-continue-unavailable{padding:10px 14px;border-top:1px solid var(--ma-line);background:var(--ma-surface-sunken);font-size:12px}
@@ -330,8 +411,8 @@ window.__ModuleLoader__.load({
 .matasks-completion button[name=completion-open-tasks]:hover:not(:disabled){background:color-mix(in srgb,var(--ma-accent-fill) 90%,var(--ma-text));border-color:var(--ma-accent-fill);color:var(--ma-on-accent)}
 .matasks-original{padding-top:6px;border-top:1px dashed var(--ma-line);color:var(--ma-muted);font-size:12px}
 .matasks-original summary{cursor:pointer;font-weight:550}
-@media(max-width:560px){.matasks-panel{gap:8px;padding:8px}.matasks-overview{gap:6px;padding:4px 6px 4px 10px}.matasks-heading{gap:6px}.matasks-tab{max-width:100%;flex:1 1 156px}.matasks-task-head{align-items:stretch;flex-direction:column;padding:10px 12px}.matasks-activity-viewport{padding:10px}.matasks-completion-body{padding:12px}}
-@media(max-width:380px){.matasks-overview-count{display:none}.matasks-tab{flex:1 1 100%}.matasks-telemetry>span{max-width:100%}.matasks-history-actions{width:100%}.matasks-history-actions button{flex:1 1 auto}}
+@container(max-width:360px){.matasks-overview{gap:2px}.matasks-overview .matasks-view-actions{gap:0}.matasks-task-head{padding-inline:7px;column-gap:4px}.matasks-history-actions{gap:0}.matasks-activity-viewport{padding-inline:7px}}
+@media(max-width:560px){.matasks-completion-body{padding:12px}}
 @media(prefers-reduced-motion:reduce){.matasks,.matasks *{scroll-behavior:auto!important;transition:none!important;animation:none!important;transform:none!important}}
 `
 
@@ -419,6 +500,7 @@ window.__ModuleLoader__.load({
         ...(value.diagnostic === undefined ? {} : { diagnostic: normalizeText(value.diagnostic) }),
         ...(Array.isArray(value.activities) ? { activities: value.activities.map(normalizeActivity).filter(Boolean) } : {}),
         ...(value.telemetry !== undefined ? { telemetry } : {}),
+        ...(value.permission ? { permission: value.permission } : {}),
         truncated: value.truncated === true,
       }
     }
@@ -437,14 +519,25 @@ window.__ModuleLoader__.load({
     }
 
     async function requestTaskAction(parentSessionId, action, options, signal) {
+      const headers = { accept: 'application/json', 'content-type': 'application/json' }
+      if (window.location?.protocol === 'dsh-app:') {
+        const params = new URLSearchParams({ parentSessionId, view: 'action-proof' })
+        const response = await fetch(`/multi-agent/tasks?${params}`, {
+          credentials: 'same-origin', headers: { accept: 'application/json', 'x-dsh-task-panel': '1' }, signal,
+        })
+        const payload = await response.json()
+        if (!response.ok || payload?.ok !== true || typeof payload.value?.proof !== 'string') throw new Error('Task panel authorization unavailable')
+        headers['x-dsh-task-proof'] = payload.value.proof
+      }
       const response = await fetch('/multi-agent/tasks', {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({
           parentSessionId,
           action,
           ...(options.childId !== undefined ? { childId: options.childId } : {}),
+          ...(action === 'set-permission' ? { choice: options.choice } : {}),
           ...(options.message !== undefined ? { message: options.message } : {}),
         }),
         signal,
@@ -710,20 +803,22 @@ window.__ModuleLoader__.load({
     const BOTTOM_TOLERANCE = 6
     const HISTORY_PAGE_SIZE = 8
 
+    const ICON_PATHS = {
+      info: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 11v6M12 7h.01'],
+      history: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 7v5l3 2'],
+      back: ['M19 12H5M11 6l-6 6 6 6'],
+      refresh: ['M19 8a7 7 0 1 0 1 5', 'M19 3v5h-5'],
+      report: ['M6 3h8l4 4v14H6z', 'M14 3v5h5', 'M9 12h6M9 16h6'],
+      shield: ['M12 3l8 3v5c0 5-3 8-8 11-5-3-8-6-8-11V6z'],
+      archive: ['M3 4h18v4H3zM5 8v12h14V8M9 12h6'],
+      restore: ['M4 10h10a5 5 0 0 1 0 10h-2M9 5l-5 5 5 5'],
+      clear: ['M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7'],
+      tool: ['M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-3-3z'],
+      down: ['M12 4v15', 'M6 13l6 6 6-6'],
+    }
+
     function Icon({ name }) {
-      const paths = name === 'info'
-        ? ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 11v6M12 7h.01']
-        : name === 'history'
-          ? ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 7v5l3 2']
-          : name === 'back'
-            ? ['M19 12H5M11 6l-6 6 6 6']
-            : name === 'refresh'
-        ? ['M19 8a7 7 0 1 0 1 5', 'M19 3v5h-5']
-        : name === 'report'
-          ? ['M6 3h8l4 4v14H6z', 'M14 3v5h5', 'M9 12h6M9 16h6']
-          : name === 'tool'
-            ? ['M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-3-3z']
-            : ['M12 4v15', 'M6 13l6 6 6-6']
+      const paths = ICON_PATHS[name]
       return h('svg', {
         className: 'matasks-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
         strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
@@ -876,7 +971,7 @@ window.__ModuleLoader__.load({
     function ActivityList({ activities, hiddenCount, t, onShowEarlier, onToolDisclosure, scope, openFile }) {
       const groups = timelineGroups(activities)
       return h('section', null,
-        h('h3', null, t('tasks.activities')),
+
         hiddenCount > 0 ? h('div', { className: 'matasks-history' }, h('button', {
           type: 'button', name: 'earlier-activities', className: 'matasks-activity-toggle', onClick: onShowEarlier,
         }, t('activities.showEarlier', { count: hiddenCount }))) : null,
@@ -1081,14 +1176,50 @@ window.__ModuleLoader__.load({
       return h('details', { className: 'matasks-continue' },
         h('summary', null, t('tasks.continue')),
         h('form', { className: 'matasks-continue-form', onSubmit: submit },
-          h('label', null, t('tasks.continueMessage')),
           h('textarea', {
-            value: message, rows: 3, required: true, disabled: manager.pending,
+            value: message, rows: 2, required: true, disabled: manager.pending,
             'aria-label': t('tasks.continueMessage'), placeholder: t('tasks.continuePlaceholder'),
             onChange: (event) => setMessage(event.currentTarget.value),
           }),
           h('button', { type: 'submit', name: `continue-${task.childId}`, disabled: manager.pending || !message.trim() },
             t('tasks.continueSubmit'))))
+    }
+
+    function TaskPermissions({ task, manager, t }) {
+      const permission = task.permission
+      const [draft, setDraft] = useState(null)
+      const native = permission.kind === 'native'
+      const selected = draft ?? permission.selected
+      const choiceLabel = (choice) => t(choice === 'subagent:auto' && task.agent !== 'codex' ? 'perm.acpAuto' : `perm.${choice}`)
+      const label = (choice) => {
+        if (choice === 'default') {
+          const base = t(native ? 'perm.nativeDefault' : 'perm.default')
+          return permission.defaultChoice ? `${base} (${choiceLabel(permission.defaultChoice)})` : base
+        }
+        return choiceLabel(choice)
+      }
+      const submit = async (event) => {
+        event.preventDefault()
+        if (manager.pending || selected === permission.selected) return
+        if (await manager.manage('set-permission', { childId: task.childId, choice: selected })) setDraft(null)
+      }
+      const effective = permission.inheritsFullAccess ? t('perm.inheritedFull') : permission.effective && label(permission.effective)
+      const launch = permission.launcher && permission.launcher !== 'acp' ? t(`perm.launcher.${permission.launcher}`) : ''
+      const current = [effective, launch].filter(Boolean).join(' · ')
+      const hint = t(native ? 'perm.nativeHint'
+        : permission.effective ? 'perm.externalHint' : 'perm.next')
+      return h('details', { className: 'matasks-continue matasks-permissions' },
+        h('summary', { title: hint, 'aria-description': hint },
+          t('perm.title'),
+          current ? h('span', { className: 'matasks-permission-current', role: 'status' },
+            t('perm.effective', { value: current })) : null,
+          permission.pending ? h('span', { role: 'status', className: 'matasks-permission-pending' }, t('perm.pending')) : null),
+        h('form', { onSubmit: submit },
+          h('select', { value: selected, disabled: manager.pending,
+            'aria-label': t('perm.selection'), title: hint, onChange: (event) => setDraft(event.currentTarget.value),
+          }, permission.choices.map((choice) => h('option', { key: choice, value: choice }, label(choice)))),
+          h('button', { type: 'submit', disabled: manager.pending || selected === permission.selected }, t('perm.save')),
+          !permission.effective ? h('span', { className: 'matasks-muted' }, t('perm.next')) : null))
     }
 
     function TaskWorkspace({ summary, parentSessionId, cwd, visible, refresh, t, openFile, stateStore, tabId, panelId, manager, onClear }) {
@@ -1123,31 +1254,38 @@ window.__ModuleLoader__.load({
         'data-task-id': task.childId,
       },
       h('header', { className: 'matasks-task-head' },
-        h('div', null,
-          h('div', { className: 'matasks-task-title' },
-            h('span', { className: 'matasks-label', id: historyViewId(parentSessionId, task.childId) }, task.label),
-            h('span', { className: 'matasks-badge' }, agentLabel(task.agent)),
-            Number.isFinite(task.continuationCount)
-              ? h('span', { className: 'matasks-badge' }, t('tasks.continuationCount', { count: task.continuationCount })) : null,
-            h(StatusBadge, { status: task.status, t })),
-          h('div', { className: 'matasks-task-timing' },
-            h(CreationTime, { startedAt: task.startedAt, t }),
-            h('span', { className: 'matasks-duration' }, formatDuration(task, t))),
-          h(TelemetryLine, { telemetry: task.telemetry, t })),
+        h('div', { className: 'matasks-task-title' },
+          !tabId ? h('span', { className: 'matasks-label', id: historyViewId(parentSessionId, task.childId) }, task.label) : null,
+          h('span', { className: 'matasks-badge' }, agentLabel(task.agent)),
+          h(StatusBadge, { status: task.status, t }),
+          task.startedAt !== undefined ? h('span', { className: 'matasks-duration', title: t('tasks.created', { time: formatStartedAt(task.startedAt, true) }) }, formatDuration(task, t)) : null),
         h('div', { className: 'matasks-actions' },
+          task.permission?.kind === 'native' && !task.permission.editable ? h('span', {
+            className: 'matasks-permission-offline', role: 'img', tabIndex: 0,
+            'aria-label': `${t('perm.title')} · ${t('perm.offline')}`, title: t('perm.nativeOffline'), 'aria-description': t('perm.nativeOffline'),
+          }, h(Icon, { name: 'shield' })) : null,
           task.reportPath ? h('button', {
-            type: 'button', name: `report-${task.childId}`,
+            type: 'button', name: `report-${task.childId}`, title: t('tasks.report'), 'aria-label': t('tasks.report'),
             onClick: () => openFile({ sessionId: parentSessionId, ...(cwd ? { cwd } : {}) }, task.reportPath),
-          }, h(Icon, { name: 'report' }), t('tasks.report')) : null,
+          }, h(Icon, { name: 'report' })) : null,
           isTerminalTask(task) && !task.archived ? h('button', {
-            type: 'button', name: `archive-${task.childId}`, disabled: manager.pending,
+            type: 'button', name: `archive-${task.childId}`, disabled: manager.pending, title: t('tasks.archive'), 'aria-label': t('tasks.archive'),
             onClick: () => manager.manage('archive', { childId: task.childId }),
-          }, t('tasks.archive')) : null,
+          }, h(Icon, { name: 'archive' })) : null,
           isTerminalTask(task) ? h('button', {
             type: 'button', name: `clear-${task.childId}`, disabled: manager.pending,
-            title: t('tasks.clearDescription'), 'aria-label': `${t('tasks.clear')}: ${task.label}`,
+            title: `${t('tasks.clear')} · ${t('tasks.clearDescription')}`, 'aria-label': `${t('tasks.clear')}: ${task.label}`,
             onClick: () => onClear(task.childId),
-          }, t('tasks.clear')) : null)),
+          }, h(Icon, { name: 'clear' })) : null),
+        h('details', { className: 'matasks-run-details' },
+          h('summary', { title: t('tasks.runDetails') },
+            task.telemetry?.model || t('tasks.runDetails')),
+          h('div', { className: 'matasks-task-timing' },
+            h(CreationTime, { startedAt: task.startedAt, t }),
+            task.continuationCount > 0 ? h('span', null, t('tasks.continuationCount', { count: task.continuationCount })) : null),
+          h(TelemetryLine, { telemetry: task.telemetry, t }))),
+      task.permission?.editable
+        ? h(TaskPermissions, { key, task, manager, t }) : null,
       h('div', { className: 'matasks-activity-frame' },
         h('div', {
           className: 'matasks-activity-viewport', ref: viewport.viewportRef, tabIndex: 0,
@@ -1158,7 +1296,7 @@ window.__ModuleLoader__.load({
           detail.error ? h('p', { role: 'alert', className: 'matasks-error' }, t('tasks.detailUnavailable')) : null,
           task.diagnostic ? h('p', { role: 'alert', className: 'matasks-error' }, task.diagnostic) : null,
           task.truncated ? h('p', { className: 'matasks-muted' }, t('tasks.truncated')) : null,
-          detail.loaded ? h(ActivityList, {
+          detail.loaded && (timelineActivities.length > 0 || (!finalOutput && !task.diagnostic)) ? h(ActivityList, {
             activities: timelineActivities, hiddenCount: Math.max(0, messages.length - visibleActivities.length), t,
             onShowEarlier: viewport.showEarlier, onToolDisclosure: viewport.onToolDisclosure, scope: fileScope, openFile,
           }) : null,
@@ -1182,7 +1320,7 @@ window.__ModuleLoader__.load({
       return `${NS}-${safeDomId(parentSessionId)}-history-view-${safeDomId(childId)}`
     }
 
-    function TaskHistory({ tasks, parentSessionId, selectedChildId, onClose, onView, onClear, backRef, viewRefs, manager, t }) {
+    function TaskHistory({ tasks, parentSessionId, selectedChildId, onClose, onView, onClear, backRef, viewRefs, manager, toolbarActions, t }) {
       const clearNoteId = `${NS}-${safeDomId(parentSessionId)}-clear-note`
       useEffect(() => { backRef.current?.focus?.() }, [backRef])
       return h('section', { className: 'matasks-task-history', 'aria-label': t('tasks.history', { count: tasks.length }),
@@ -1190,40 +1328,42 @@ window.__ModuleLoader__.load({
       },
         h('header', { className: 'matasks-history-heading' },
           h('h2', null, t('tasks.history', { count: tasks.length })),
-          h('button', { type: 'button', name: 'history-back', ref: backRef, onClick: onClose }, t('tasks.backToCurrent'))),
+          h('div', { className: 'matasks-history-actions' },
+            toolbarActions,
+            tasks.some(isTerminalTask) ? h('button', {
+              type: 'button', name: 'clear-history', disabled: manager.pending,
+              title: `${t('tasks.clearHistory')} · ${t('tasks.clearDescription')}`, 'aria-label': t('tasks.clearHistory'), 'aria-describedby': clearNoteId,
+              onClick: () => onClear(),
+            }, h(Icon, { name: 'clear' })) : null,
+            h('button', { type: 'button', name: 'history-back', ref: backRef, onClick: onClose,
+              title: t('tasks.backToCurrent'), 'aria-label': t('tasks.backToCurrent') }, h(Icon, { name: 'back' })))),
         h('div', { className: 'matasks-history-body' },
-          h('p', { className: 'matasks-muted' }, t(tasks.length ? 'tasks.historyDescription' : 'tasks.historyEmpty')),
-          h('p', { id: clearNoteId, className: 'matasks-muted' }, t('tasks.clearDescription')),
-          tasks.some(isTerminalTask) ? h('button', {
-            type: 'button', name: 'clear-history', disabled: manager.pending,
-            title: t('tasks.clearDescription'), 'aria-describedby': clearNoteId,
-            onClick: () => onClear(),
-          }, t('tasks.clearHistory')) : null,
+          tasks.length === 0 ? h('p', { className: 'matasks-muted' }, t('tasks.historyEmpty')) : null,
+          h('p', { id: clearNoteId, hidden: true }, t('tasks.clearDescription')),
           h('ul', { className: 'matasks-history-list' }, tasks.map((task) => h('li', {
             key: task.childId, className: 'matasks-history-row',
             'data-history-task-id': task.childId, 'data-selected': task.childId === selectedChildId,
           },
           h('div', { className: 'matasks-history-main' },
-            h('span', { className: 'matasks-label' }, task.label),
-            h('span', { className: 'matasks-badge' }, agentLabel(task.agent)),
-            h(StatusBadge, { status: task.status, t }),
-            h(CreationTime, { startedAt: task.startedAt, t })),
-          h('div', { className: 'matasks-history-actions' },
             h('button', {
               type: 'button', name: `history-view-${task.childId}`, id: historyViewId(parentSessionId, task.childId),
+              className: 'matasks-history-link', title: `${t('tasks.viewHistory')} · ${task.label}`,
               ref: (node) => { if (node) viewRefs.current.set(task.childId, node); else viewRefs.current.delete(task.childId) },
-              'aria-label': `${t('tasks.viewHistory')}: ${task.label}`, onClick: () => onView(task.childId),
-            }, t('tasks.viewHistory')),
+              onClick: () => onView(task.childId),
+            }, task.label),
+            h('span', { className: 'matasks-history-meta' }, agentLabel(task.agent), ' · ', h(CreationTime, { startedAt: task.startedAt, t }))),
+          h('div', { className: 'matasks-history-actions' },
+            h(StatusBadge, { status: task.status, t }),
             h('button', {
               type: 'button', name: `restore-${task.childId}`, disabled: manager.pending,
-              title: t('tasks.restoreDescription'), 'aria-label': `${t('tasks.restore')}: ${task.label}`,
+              title: `${t('tasks.restore')} · ${t('tasks.restoreDescription')}`, 'aria-label': `${t('tasks.restore')}: ${task.label}`,
               onClick: () => manager.manage('restore', { childId: task.childId }),
-            }, t('tasks.restore')),
+            }, h(Icon, { name: 'restore' })),
             isTerminalTask(task) ? h('button', {
               type: 'button', name: `clear-${task.childId}`, disabled: manager.pending,
-              title: t('tasks.clearDescription'), 'aria-label': `${t('tasks.clear')}: ${task.label}`, 'aria-describedby': clearNoteId,
+              title: `${t('tasks.clear')} · ${t('tasks.clearDescription')}`, 'aria-label': `${t('tasks.clear')}: ${task.label}`, 'aria-describedby': clearNoteId,
               onClick: () => onClear(task.childId),
-            }, t('tasks.clear')) : null))))))
+            }, h(Icon, { name: 'clear' })) : null))))))
     }
 
     function TasksPanel({ scope, tab, visible, t, openFile, taskStore }) {
@@ -1389,30 +1529,48 @@ window.__ModuleLoader__.load({
         tabRefs.current.get(childId)?.focus({ preventScroll: true })
       }
 
+      useEffect(() => {
+        if (visible && !historyOpen) tabRefs.current.get(selectedChildId)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+      }, [selectedChildId, visible, historyOpen])
+
+      const toolbarActions = h('div', { className: 'matasks-view-actions' },
+        !historyOpen ? h('button', { type: 'button', name: 'open-history', ref: historyButtonRef,
+          title: t('tasks.history', { count: historyTasks.length }), 'aria-label': t('tasks.history', { count: historyTasks.length }),
+          onClick: () => setHistoryOpen(true) }, h(Icon, { name: 'history' }), h('span', null, historyTasks.length)) : null,
+        !historyOpen && selectedSummary?.archived ? h('button', { type: 'button', name: 'back-current', onClick: returnToCurrent,
+          title: t('tasks.backToCurrent'), 'aria-label': t('tasks.backToCurrent') }, h(Icon, { name: 'back' })) : null,
+        h('details', { className: 'matasks-session-meta', onKeyDown: (event) => {
+          if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector?.('summary')?.focus() }
+        } },
+          h('summary', { title: t('tasks.sessionMetadata'), 'aria-label': t('tasks.sessionMetadata') }, h(Icon, { name: 'info' })),
+          h('dl', null,
+            h('dt', null, t('tasks.mainSession')), h('dd', null, h('code', null, parentSessionId || '—')),
+            selectedSummary ? h('dt', null, t('tasks.childSession')) : null,
+            selectedSummary ? h('dd', null, h('code', null, selectedSummary.childId)) : null)),
+        h('button', { type: 'button', name: 'refresh-tasks', title: t('tasks.refresh'), 'aria-label': t('tasks.refresh'),
+          onClick: () => setRefresh((value) => value + 1) }, h(Icon, { name: 'refresh' })))
       const theme = useTheme()
       return h('div', { className: 'matasks matasks-panel', 'data-ma-theme': theme },
         h('style', null, `${THEME_CSS}\n${CSS}`),
-        h('header', { className: 'matasks-overview' },
-          h('div', { className: 'matasks-heading' },
+        !historyOpen ? h('header', { className: 'matasks-overview' },
+          h('div', { className: 'matasks-heading', hidden: !historyOpen && activeTasks.length > 0 },
             h('h2', null, t('tasks.title')),
             h('span', { className: 'matasks-overview-count', title: t('tasks.overview', { count: activeTasks.length }) },
               t('tasks.overview', { count: activeTasks.length }))),
-          h('div', { className: 'matasks-view-actions' },
-            !historyOpen ? h('button', { type: 'button', name: 'open-history', ref: historyButtonRef,
-              title: t('tasks.history', { count: historyTasks.length }), 'aria-label': t('tasks.history', { count: historyTasks.length }),
-              onClick: () => setHistoryOpen(true) }, h(Icon, { name: 'history' }), h('span', null, historyTasks.length)) : null,
-            !historyOpen && selectedSummary?.archived ? h('button', { type: 'button', name: 'back-current', onClick: returnToCurrent,
-              title: t('tasks.backToCurrent'), 'aria-label': t('tasks.backToCurrent') }, h(Icon, { name: 'back' })) : null,
-            h('details', { className: 'matasks-session-meta', onKeyDown: (event) => {
-              if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector?.('summary')?.focus() }
-            } },
-              h('summary', { title: t('tasks.sessionMetadata'), 'aria-label': t('tasks.sessionMetadata') }, h(Icon, { name: 'info' })),
-              h('dl', null,
-                h('dt', null, t('tasks.mainSession')), h('dd', null, h('code', null, parentSessionId || '—')),
-                selectedSummary ? h('dt', null, t('tasks.childSession')) : null,
-                selectedSummary ? h('dd', null, h('code', null, selectedSummary.childId)) : null)),
-            h('button', { type: 'button', name: 'refresh-tasks', title: t('tasks.refresh'), 'aria-label': t('tasks.refresh'),
-              onClick: () => setRefresh((value) => value + 1) }, h(Icon, { name: 'refresh' })))), 
+          !historyOpen && activeTasks.length > 0 ? h('div', { className: 'matasks-tabs', role: 'tablist', 'aria-label': t('tasks.childTabs') },
+            activeTasks.map((task, index) => h('button', {
+              key: task.childId, type: 'button', name: `task-tab-${task.childId}`, role: 'tab',
+              title: [task.label, agentLabel(task.agent), statusLabel(task.status, t),
+                task.startedAt === undefined ? t('tasks.createdUnknown') : t('tasks.created', { time: formatStartedAt(task.startedAt, true) })].join(' · '),
+              id: tabId(task), 'aria-controls': panelId(task), 'aria-selected': task.childId === selectedChildId,
+              'aria-label': [task.label, agentLabel(task.agent), statusLabel(task.status, t)].join(' · '),
+              tabIndex: task.childId === keyboardChildId ? 0 : -1, className: 'matasks-tab',
+              ref: (node) => { if (node) tabRefs.current.set(task.childId, node); else tabRefs.current.delete(task.childId) },
+              onClick: () => selectTask(task.childId), onKeyDown: (event) => onTabKeyDown(event, index),
+            },
+            h(StatusBadge, { status: task.status, t }),
+            h('span', { className: 'matasks-tab-label' }, task.label)))) : null,
+          toolbarActions) : null,
         list.error ? h('p', { role: 'alert', className: 'matasks-error' }, t('tasks.historyUnavailable')) : null,
         manager.error ? h('p', { role: 'alert', className: 'matasks-error' }, manager.error) : null,
         manager.receipt && selectedSummary?.childId === manager.receipt.childId ? h('p', { role: 'status', className: 'matasks-muted matasks-receipt' },
@@ -1422,21 +1580,8 @@ window.__ModuleLoader__.load({
         list.status === 'ready' && tasks.length === 0 ? h('p', { role: 'status', className: 'matasks-empty', tabIndex: -1, ref: emptyStatusRef }, t('tasks.empty')) : null,
         !historyOpen && !selectedSummary && list.status === 'ready' && tasks.length > 0 && activeTasks.length === 0
           ? h('p', { role: 'status', className: 'matasks-empty', tabIndex: -1, ref: emptyStatusRef }, t('tasks.activeEmpty')) : null,
-        !historyOpen && activeTasks.length > 0 ? h('div', { className: 'matasks-tabs', role: 'tablist', 'aria-label': t('tasks.childTabs') },
-          activeTasks.map((task, index) => h('button', {
-            key: task.childId, type: 'button', name: `task-tab-${task.childId}`, role: 'tab',
-            id: tabId(task), 'aria-controls': panelId(task), 'aria-selected': task.childId === selectedChildId,
-            tabIndex: task.childId === keyboardChildId ? 0 : -1, className: 'matasks-tab',
-            ref: (node) => { if (node) tabRefs.current.set(task.childId, node); else tabRefs.current.delete(task.childId) },
-            onClick: () => selectTask(task.childId), onKeyDown: (event) => onTabKeyDown(event, index),
-          },
-          h('span', { className: 'matasks-tab-copy' },
-            h('span', { className: 'matasks-tab-provider' }, agentLabel(task.agent)),
-            h('span', { className: 'matasks-tab-label' }, task.label),
-            h(CreationTime, { startedAt: task.startedAt, t })),
-          h(StatusBadge, { status: task.status, t })))) : null,
         historyOpen ? h(TaskHistory, {
-          tasks: historyTasks, parentSessionId, selectedChildId, manager, t,
+          tasks: historyTasks, parentSessionId, selectedChildId, manager, toolbarActions, t,
           backRef: historyBackRef, viewRefs: historyViewRefs, onClear: clearFromHistory,
           onClose: returnToCurrent, onView: viewHistory,
         }) : null,
