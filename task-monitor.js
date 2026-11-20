@@ -91,6 +91,7 @@ const storedTaskSchema = z.object({
   archived: z.boolean(), hidden: z.boolean(), continuationCount: z.number().default(0),
   continuation: z.object({ agent: z.enum(['codex', 'kimi-code', 'agy']), sessionId: z.string().min(1) }).optional(),
   direct: z.boolean().default(false),
+  directSandboxMode: z.enum(['default', 'read-only', 'workspace-write', 'danger-full-access']).optional(),
   output: z.string().optional(), diagnostic: z.string().optional(), truncated: z.boolean().default(false),
   permissionChoice: z.enum(CODEX_PERMISSION_CHOICES).optional(),
   nativeSandboxDefault: z.enum(NATIVE_SANDBOX_MODES).optional(),
@@ -180,6 +181,7 @@ export class MultiAgentTasks extends Service {
       status: record.status, startedAt: record.startedAt, updatedAt: record.updatedAt, finishedAt: record.finishedAt,
       archived: Boolean(record.archived), hidden: Boolean(record.hidden), continuationCount: record.continuationCount || 0,
       continuation: record.continuation, direct: record.direct === true,
+      directSandboxMode: record.directSandboxMode,
       output: record.output, diagnostic: record.diagnostic, truncated: record.truncated,
       permissionChoice: record.permissionChoice, nativeSandboxDefault: record.nativeSandboxDefault,
       telemetry: record.telemetry,
@@ -526,7 +528,7 @@ export class MultiAgentTasks extends Service {
     }
   }
 
-  begin({ parentSessionId, agent, label, cwd, reportPath, providerName, language, direct = false }) {
+  begin({ parentSessionId, agent, label, cwd, reportPath, providerName, language, direct = false, directSandboxMode }) {
     this.assertStorageAvailable()
     const time = this.timestamp()
     const record = {
@@ -538,6 +540,7 @@ export class MultiAgentTasks extends Service {
       providerName,
       language,
       direct: direct === true,
+      directSandboxMode,
       generation: 1,
       aliases: new Set(),
       continuationCount: 0,
@@ -860,10 +863,10 @@ export class MultiAgentTasks extends Service {
 
   // Only the authenticated panel can call this mutation. Serialize with history writes and
   // publish an external override after the durable write succeeds, including on cold resume.
-  setTaskPermission(parentSessionId, childId, choice) {
+  setTaskPermission(parentSessionId, childId, choice, allowHidden = false) {
     const change = this.pendingWrites.then(async () => {
       const record = this.getRecord(parentSessionId, childId)
-      if (typeof childId !== 'string' || !childId || !record || record.hidden || !this.permissionView(record)?.editable) {
+      if (typeof childId !== 'string' || !childId || !record || (!allowHidden && record.hidden) || !this.permissionView(record)?.editable) {
         throw new Error('Permission settings are unavailable for this task')
       }
       if (record.agent === 'dsh') {
@@ -891,6 +894,14 @@ export class MultiAgentTasks extends Service {
     })
     this.pendingWrites = change.catch(() => {})
     return change
+  }
+
+  async resetDirectPermission(parentSessionId, agent) {
+    const record = [...this.records].filter((candidate) => candidate.direct && candidate.parentSessionId === parentSessionId && candidate.agent === agent && candidate.childId)
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0]
+    if (!record || agent === 'dsh' || record.permissionChoice === undefined) return { reset: false }
+    await this.setTaskPermission(parentSessionId, record.childId, 'default', true)
+    return { reset: true, childId: record.childId }
   }
 
   detail(parentSessionId, childId) {
@@ -959,6 +970,8 @@ export class MultiAgentTasks extends Service {
           const agent = findRootAgent(this.ctx, args.parentSessionId)
           if (!agent) throw new Error('Open the parent conversation before starting direct Agent chat')
           value = await this.directChat(agent, args)
+        } else if (args.action === 'direct-permission-reset') {
+          value = await this.resetDirectPermission(args.parentSessionId, args.agent)
         } else if (args.action === 'set-permission') {
           value = await this.setTaskPermission(args.parentSessionId, args.childId, args.choice)
         } else value = this.manage(args.parentSessionId, args)

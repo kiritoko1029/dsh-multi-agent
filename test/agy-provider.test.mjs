@@ -115,14 +115,14 @@ function spawnAcpChild(spec) {
   }
 }
 
-function harness({ model: initialModel, reasoningEffort: initialEffort, available = true, env = {}, proxyMode, proxyUrl, manualCommand, permission = 'allow', parent, permissionPresets, sandboxPolicy, approval } = {}) {
+function harness({ model: initialModel, reasoningEffort: initialEffort, available = true, env = {}, proxyMode, proxyUrl, manualCommand, permission = 'allow', parent, permissionPresets, sandboxPolicy, approval, args: customArgs } = {}) {
   let model = initialModel
   let reasoningEffort = initialEffort
   const state = { observations: [], saved: [], warnings: [], spawns: [] }
   const config = {
     providerName: 'agy',
     command: manualCommand ?? (available ? process.execPath : undefined),
-    args: ['--eval', ACP_AGENT_SOURCE],
+    args: customArgs ?? ['--eval', ACP_AGENT_SOURCE],
     permission,
     env,
     proxyMode,
@@ -337,6 +337,16 @@ test('agy does not bypass permissions for a non-full main-session preset', async
   })
   await agent.run()
   assert.equal(agent.state.spawns[0].argv.includes('--dangerously-skip-permissions'), false)
+})
+
+test('direct agy strict permissions remove a stale custom bypass without changing ordinary dispatch', async () => {
+  const args = ['--eval', ACP_AGENT_SOURCE, '--dangerously-skip-permissions']
+  const direct = harness({ permission: 'reject', args })
+  await direct.run({ record: { agent: 'agy', cwd: process.cwd(), direct: true } })
+  assert.equal(direct.state.spawns[0].argv.includes('--dangerously-skip-permissions'), false)
+  const ordinary = harness({ permission: 'reject', args })
+  await ordinary.run()
+  assert.equal(ordinary.state.spawns[0].argv.includes('--dangerously-skip-permissions'), true)
 })
 
 test('agy rejects unavailable models and efforts before prompt', async () => {

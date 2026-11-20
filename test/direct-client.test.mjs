@@ -97,6 +97,7 @@ test('direct Agent selection preserves the native composer and only swaps intern
   assert.equal(app.registrations.some((entry) => entry.spec.name === 'conversation.composer'), false)
   const activity = app.registrations.find((entry) => entry.spec.name === 'conversation.input.activity')
   assert.ok(activity)
+  assert.ok((activity.spec.priority ?? 0) < 0, 'activity picker shadows priority-0 single slot entries')
   let input = { draft: 'hello', draftRev: 1, attachmentIds: ['file-1'], phase: 'plain' }
   const writes = []
   const props = {
@@ -142,15 +143,12 @@ test('direct Agent selection preserves the native composer and only swaps intern
   for (const cleanup of app.cleanups) cleanup()
 })
 
-test('direct replies become visible native assistant nodes with message-id identity and no fabricated Step', () => {
+test('direct replies become visible native assistant nodes carried by legal command pairs', () => {
   const app = setup()
-  const definition = app.definitions[0]
+  const definition = app.definitions.find((entry) => entry.kind === 'multi-agent-direct-assistant')
   const event = {
-    type: 'assistant/message', surfaceOp: 'append', seq: 12, time: 100,
-    data: { turn: 1_000_000_000, step: 0, message: {
-      id: 'message-a', role: 'assistant', content: [{ type: 'text', text: '**回复**' }],
-      source: { kind: 'model', provider: 'multi-agent-codex', model: 'codex' },
-    } },
+    type: 'command/done', seq: 13, time: 100,
+    data: { commandId: 'ma-direct-msg-codex--message-a', kind: 'success', text: '**回复**' },
   }
   assert.equal(definition.match(event).role, 'start')
   assert.equal(definition.match(event).exclusive, true)
@@ -158,9 +156,73 @@ test('direct replies become visible native assistant nodes with message-id ident
   const node = definition.buildViewNode({ key: 'node-a', id: 'message-a', state, start: { location: { kind: 'unresolved' } } })
   assert.equal(node.kind, 'assistant-step')
   assert.equal(node.visibility, 'visible')
-  assert.equal(node.data.finalNode.messageId, 'message-a')
+  assert.equal(node.anchorSeq, 12.9)
+  assert.equal(node.data.finalNode.messageId, 'ma-direct-msg-codex--message-a')
+  assert.equal(node.data.finalNode.providerMetadata.provider, 'multi-agent-codex')
   assert.equal(node.data.blocks[0].text, '**回复**')
-  const ordinary = { ...event, data: { ...event.data, message: { ...event.data.message, source: { kind: 'model', provider: 'deepseek', model: 'chat' } } } }
-  assert.equal(definition.match(ordinary), null)
+  assert.equal(definition.match({ ...event, data: { ...event.data, commandId: 'cmd-native-1' } }), null)
+  assert.equal(definition.match({ ...event, data: { ...event.data, kind: 'error', text: 'boom' } }), null)
+  assert.equal(definition.match({ ...event, data: { ...event.data, text: '' } }), null)
+  assert.equal(definition.match({ type: 'assistant/message', surfaceOp: 'append', seq: 20, data: {} }), null)
+  for (const cleanup of app.cleanups) cleanup()
+})
+
+test('direct user input becomes a chat node anchored to its command run', () => {
+  const app = setup()
+  const definition = app.definitions.find((entry) => entry.kind === 'multi-agent-direct-input')
+  const event = {
+    type: 'command/run', seq: 12, time: 100,
+    data: { commandId: 'cmd-native-12', name: 'agent-codex', args: '发布当前这个新版本', source: { kind: 'user' } },
+  }
+  assert.equal(definition.match(event).role, 'start')
+  assert.equal(definition.match(event).exclusive, true)
+  const state = definition.start(undefined, { event })
+  const node = definition.buildViewNode({ key: 'node-u', id: 'input-12', state, start: { location: { kind: 'unresolved' } } })
+  assert.equal(node.kind, 'multi-agent-direct-input')
+  assert.equal(node.visibility, 'visible')
+  assert.equal(node.anchorSeq, 11.9)
+  assert.equal(node.data.text, '发布当前这个新版本')
+  assert.equal(node.data.commandId, 'cmd-native-12')
+  assert.equal(definition.match({ ...event, data: { ...event.data, commandId: 'ma-direct-msg-codex--x' } }), null, 'synthetic assistant runs are excluded')
+  assert.equal(definition.match({ ...event, data: { ...event.data, args: '' } }), null)
+  assert.equal(definition.match({ ...event, data: { ...event.data, name: 'goal' } }), null)
+  const userView = app.registrations.find((entry) => entry.spec.name === 'conversation.chat.node' && entry.spec.key === 'multi-agent-direct-input')
+  assert.ok(userView, 'user input bubble view is registered')
+  const rendered = userView.component({ node, renderFactorySlot: (_slot, props) => props.text })
+  assert.equal(rendered.props.className, 'ma-direct-user-row')
+  for (const cleanup of app.cleanups) cleanup()
+})
+
+test('a throwing subscriber cannot block direct agent selection or closing the picker menu', () => {
+  const app = setup()
+  const activity = app.registrations.find((entry) => entry.spec.name === 'conversation.input.activity')
+  let input = { draft: '', draftRev: 1, attachmentIds: [], phase: 'plain' }
+  const props = {
+    sessionId: 'session-err', useInput: (selector) => selector(input),
+    inputActions: {
+      setDraft(value) { input = { ...input, draft: value, draftRev: input.draftRev + 1 } },
+      persistDraft() {},
+    },
+  }
+  const wrapper = app.runtime.mount(activity.component, props)
+  const wrapped = wrapper.render()
+  const direct = app.runtime.mount(wrapped.type, wrapped.props)
+  let pickerTree = direct.render()
+  const unsub = pickerTree.props.store.subscribe(() => { throw new Error('broken listener') })
+  const picker = app.runtime.mount(pickerTree.type, pickerTree.props)
+  let tree = picker.render()
+  named(tree, 'button', 'direct-agent-picker').props.onClick()
+  tree = picker.render()
+  assert.ok(named(tree, 'button', 'direct-agent-codex'))
+  named(tree, 'button', 'direct-agent-codex').props.onClick()
+  tree = picker.render()
+  assert.equal(named(tree, 'button', 'direct-agent-codex'), undefined, 'picker menu closes even if another listener throws')
+  pickerTree = direct.render()
+  assert.equal(pickerTree.props.selected, 'codex')
+  assert.equal(input.draft, '/agent-codex ')
+  unsub()
+  picker.dispose()
+  direct.dispose()
+  wrapper.dispose()
   for (const cleanup of app.cleanups) cleanup()
 })

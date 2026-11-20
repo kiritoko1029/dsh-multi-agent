@@ -75,9 +75,11 @@ try {
     slots: { inject: () => () => {} },
     effect(callback) { callback(); return () => {} },
   })
-  assert.equal(definitions.length, 1)
-  const directDefinition = definitions[0]
-  const eventDefinitions = { entries: () => [assistantDefinition, directDefinition], fallbackEntry: () => undefined }
+  assert.equal(definitions.length, 2)
+  const directDefinition = definitions.find((definition) => definition.kind === 'multi-agent-direct-assistant')
+  const directInputDefinition = definitions.find((definition) => definition.kind === 'multi-agent-direct-input')
+  assert.ok(directDefinition && directInputDefinition)
+  const eventDefinitions = { entries: () => [assistantDefinition, directDefinition, directInputDefinition], fallbackEntry: () => undefined }
   const viewDefinitions = {
     entries: () => [{
       target: 'chat',
@@ -98,16 +100,13 @@ try {
     }],
   }
   const assembler = new ConversationNodeAssembler(eventDefinitions, viewDefinitions)
-  const event = (seq, id, text) => ({
-    type: 'assistant/message', surfaceOp: 'append', seq, time: 100 + seq,
-    data: {
-      turn: 1_000_000_000, step: 0,
-      message: {
-        id, role: 'assistant', content: [{ type: 'text', text }],
-        source: { kind: 'model', provider: 'multi-agent-codex', model: 'codex' },
-      },
-      stream: [],
-    },
+  const mirror = (seq, suffix, text) => ([
+    { type: 'command/run', seq, time: 100 + seq, data: { commandId: `ma-direct-msg-codex--${suffix}`, name: 'agent-codex', source: { kind: 'user' } } },
+    { type: 'command/done', seq: seq + 1, time: 101 + seq, data: { commandId: `ma-direct-msg-codex--${suffix}`, kind: 'success', text } },
+  ])
+  const userRun = (seq) => ({
+    type: 'command/run', seq, time: 100 + seq,
+    data: { commandId: `cmd-native-${seq}`, name: 'agent-codex', args: '发布当前这个新版本', source: { kind: 'user' } },
   })
   const rootEvents = [
     { type: 'turn/start', seq: 1, time: 101, data: { turn: 1 } },
@@ -124,24 +123,30 @@ try {
       },
     },
   ]
-  assembler.replaceWindow([...rootEvents, event(4, 'm1', 'first')].map((event) => ({ type: 'event', event })), false)
+  assembler.replaceWindow([...rootEvents, userRun(4), ...mirror(5, 'm1', 'first')].map((event) => ({ type: 'event', event })), false)
   assembler.activateTarget('chat')
   let nodes = assembler.snapshot('chat')
-  assert.equal(nodes.length, 2)
-  assert.equal(nodes.find((node) => node.data.finalNode?.messageId === 'root-message')?.data.blocks[0].text, 'root response')
-  assert.equal(nodes.find((node) => node.data.finalNode?.messageId === 'm1')?.visibility, 'visible')
-  assembler.append({ type: 'event', event: event(5, 'm2', 'second') })
-  assembler.flush()
-  nodes = assembler.snapshot('chat')
   assert.equal(nodes.length, 3)
-  assert.deepEqual([...nodes].map((node) => node.data.finalNode?.messageId).sort(), ['m1', 'm2', 'root-message'])
-  assembler.append({ type: 'event', event: event(6, 'm3', 'continued') })
+  assert.equal(nodes.find((node) => node.data.finalNode?.messageId === 'root-message')?.data.blocks[0].text, 'root response')
+  assert.equal(nodes.find((node) => node.data.finalNode?.messageId === 'ma-direct-msg-codex--m1')?.visibility, 'visible')
+  assert.equal(nodes.find((node) => node.kind === 'multi-agent-direct-input')?.data.text, '发布当前这个新版本')
+  assembler.append({ type: 'event', event: mirror(7, 'm2', 'second')[0] })
+  assembler.append({ type: 'event', event: mirror(7, 'm2', 'second')[1] })
   assembler.flush()
   nodes = assembler.snapshot('chat')
   assert.equal(nodes.length, 4)
+  assert.deepEqual([...nodes].map((node) => node.data.finalNode?.messageId ?? node.id).sort().join(), [
+    'ma-direct-msg-codex--m1', 'ma-direct-msg-codex--m2',
+    'direct-input-cmd-native-4', 'root-message',
+  ].sort().join())
+  assembler.append({ type: 'event', event: mirror(9, 'm3', 'continued')[0] })
+  assembler.append({ type: 'event', event: mirror(9, 'm3', 'continued')[1] })
+  assembler.flush()
+  nodes = assembler.snapshot('chat')
+  assert.equal(nodes.length, 5)
   assert.equal(nodes.find((node) => node.data.finalNode?.messageId === 'root-message')?.data.blocks[0].text, 'root response')
-  assert.ok([...nodes].every((node) => node.kind === 'assistant-step' && node.visibility === 'visible'))
-  console.log('rc.5 assembler verified: direct first/multiple/continued replies are visible and do not overwrite an existing root assistant Step')
+  assert.ok([...nodes].filter((node) => node.kind === 'assistant-step').every((node) => node.visibility === 'visible'))
+  console.log('rc.5 assembler verified: direct user/assistant command-carried replies are visible and do not overwrite an existing root assistant Step')
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

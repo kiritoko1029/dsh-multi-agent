@@ -26,6 +26,7 @@ function stageBuildRoot(t) {
   cpSync(join(root, 'client.js'), join(tempRoot, 'client.js'))
   cpSync(join(root, 'tasks-client.js'), join(tempRoot, 'tasks-client.js'))
   cpSync(join(root, 'direct-client.js'), join(tempRoot, 'direct-client.js'))
+  cpSync(join(root, 'controls-client.js'), join(tempRoot, 'controls-client.js'))
   for (const icon of ['deepseek', 'openai', 'kimi', 'google']) {
     cpSync(join(root, 'assets', 'icons', `${icon}.svg`), join(tempRoot, 'assets', 'icons', `${icon}.svg`))
   }
@@ -59,15 +60,16 @@ function assertBundleRuntime(source) {
     assert.equal(id, 'react', 'third-party parser and internal theme module must not need a Host runtime module')
     return { createElement() {}, memo: component => component }
   })
-  assert.deepEqual(imports, ['react', 'react', 'react'])
+  assert.deepEqual(imports, ['react', 'react', 'react', 'react'])
   assert.equal(typeof plugin.apply, 'function')
   assert.equal(sandbox.markdownit, undefined, 'parser must not leak a global')
   assert.ok(source.includes('markdown-it 14.1.0'))
   assert.ok(source.includes('THIRD_PARTY_NOTICES.md'))
   assert.ok(source.includes(THEME_STORAGE_KEY))
   assert.ok(source.includes(THEME_CHANGE_EVENT))
-  assert.ok(source.includes('ctx.inject(direct.inject'), 'direct Client must apply within its declared injection scope')
+  assert.ok(source.includes('ctx.inject(directInject'), 'direct selector and controls must share one declared injection scope')
   assert.ok(!source.includes('direct.apply(ctx);'), 'direct Client must not bypass its injection contract')
+  assert.ok(source.includes('direct.apply(child); controls.apply(child);'), 'direct controls must share the selector lifecycle')
   for (const id of THEME_IDS) {
     assert.ok(source.includes(`'${id}'`), `bundle must declare theme id ${id}`)
   }
@@ -231,7 +233,12 @@ test('client-bundle synchronizes themes instantly across settings modal, task pa
 
     const runtime = createMiniReact()
     const plugin = win._entry.factory(() => runtime.React)
+    const slotEntries = new Map([
+      ['conversation.input.model', [{ spec: { name: 'conversation.input.model' }, comp: () => null }]],
+      ['conversation.input.permission', [{ spec: { name: 'conversation.input.permission' }, comp: () => null }]],
+    ])
     const slots = new Map()
+    const SINGLE_SLOTS = new Set(['conversation.input.activity', 'conversation.input.model', 'conversation.input.permission'])
     const effectCleanups = []
     const formStub = {
       getSnapshot: () => ({ status: 'ready', writable: true, revision: 1, value: { selectionMode: 'auto', timeoutSeconds: 1800, routes: [{ agent: 'codex', prompt: 'test' }] } }),
@@ -250,10 +257,55 @@ test('client-bundle synchronizes themes instantly across settings modal, task pa
       uiConversation: { events: { register: () => () => {} } },
       slots: {
         inject: (_name, cb) => cb(),
-        register: (spec, comp) => { slots.set(`${spec.name}:${spec.key || spec.id}`, comp); return () => {} },
+        register: (spec, comp) => {
+          const priority = spec.priority ?? 0
+          const list = slotEntries.get(spec.name) ?? []
+          const collision = list.find((item) => {
+            if ((item.spec.priority ?? 0) !== priority) return false
+            if (SINGLE_SLOTS.has(spec.name)) return true
+            if (spec.key !== undefined) return item.spec.key === spec.key
+            if (spec.id !== undefined) return item.spec.id === spec.id
+            return false
+          })
+          if (collision) {
+            throw new Error(`slot "${spec.name}" already has an entry at priority ${priority}`)
+          }
+          const entry = { spec, comp }
+          list.push(entry)
+          slotEntries.set(spec.name, list)
+          slots.set(`${spec.name}:${spec.key || spec.id || ''}`, comp)
+          return () => {
+            const index = list.indexOf(entry)
+            if (index >= 0) list.splice(index, 1)
+          }
+        },
       },
     }
     plugin.apply(ctx)
+
+    // Selecting a child agent in the built bundle must shadow native priority-0 model/permission seats without throwing.
+    let directInput = { draft: '', draftRev: 1, attachmentIds: [], phase: 'plain' }
+    const ActivityComp = slots.get('conversation.input.activity:')
+    const directApp = runtime.mount({
+      activity: () => runtime.React.createElement(ActivityComp, {
+        sessionId: 's1',
+        useInput: (selector) => selector(directInput),
+        inputActions: {
+          setDraft(value) { directInput = { ...directInput, draft: value, draftRev: directInput.draftRev + 1 } },
+          persistDraft() {},
+        },
+      }),
+    })
+    let directTrees = directApp.renderAll()
+    findNodes(directTrees.activity, (n) => n.type === 'button' && n.props.name === 'direct-agent-picker')[0].props.onClick()
+    directTrees = directApp.renderAll()
+    findNodes(directTrees.activity, (n) => n.type === 'button' && n.props.name === 'direct-agent-codex')[0].props.onClick()
+    directTrees = directApp.renderAll()
+    assert.equal(findNodes(directTrees.activity, (n) => n.type === 'button' && n.props.name === 'direct-agent-codex').length, 0)
+    assert.equal(directInput.draft, '/agent-codex ')
+    assert.equal(slotEntries.get('conversation.input.model').some((item) => (item.spec.priority ?? 0) < 0), true)
+    assert.equal(slotEntries.get('conversation.input.permission').some((item) => (item.spec.priority ?? 0) < 0), true)
+    directApp.dispose()
 
     const HeaderComp = slots.get('conversation.session.header.utilities:multi-agent-dispatch')
     const OverlayComp = slots.get('shell.overlay:multi-agent-dispatch')

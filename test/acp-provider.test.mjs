@@ -365,6 +365,19 @@ for (const mode of ['resume', 'load']) {
   })
 }
 
+test('direct Kimi continuation applies the current model and reasoning configuration', async () => {
+  const agent = harness('direct-model', 'high', { ACP_RESUME_MODE: 'resume' })
+  const trace = { record: { cwd: process.cwd(), direct: true }, resume: { agent: 'kimi-code', sessionId: 'original-session' } }
+  const result = await agent.run(trace)
+  assert.deepEqual(result.requests, [
+    { method: 'initialize' },
+    { method: 'session/resume', sessionId: 'original-session' },
+    { method: 'session/set_config_option', sessionId: 'original-session', configId: 'model', value: 'direct-model' },
+    { method: 'session/set_config_option', sessionId: 'original-session', configId: 'thinking', value: 'high' },
+    { method: 'session/prompt', sessionId: 'original-session' },
+  ])
+})
+
 test('Kimi refuses unsupported resume rather than creating a new session', async () => {
   const agent = harness(undefined)
   await assert.rejects(agent.run({ record: { cwd: process.cwd() }, resume: { agent: 'kimi-code', sessionId: 'original-session' } }), /resume-session/)

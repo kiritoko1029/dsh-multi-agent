@@ -23,6 +23,10 @@ window.__ModuleLoader__.load({
     }
     const COMMAND_NAMES = new Set(['agent-dsh', 'agent-codex', 'agent-kimi', 'agent-agy'])
     const DIRECT_PREFIX = /^\/agent-(?:dsh|codex|kimi|agy)(?:\s|$)/
+    // Mirror carriers share the composer command names; the commandId prefix
+    // distinguishes the synthetic assistant pairs claimed below.
+    const MIRROR_MSG_PREFIX = 'ma-direct-msg-'
+    const DIRECT_AGENTS = ['dsh', 'codex', 'kimi-code', 'agy']
     const DICT = {
       zh: {
         'direct.pick': '选择消息发送到的 Agent',
@@ -45,12 +49,15 @@ window.__ModuleLoader__.load({
 .ma-direct-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;flex:0 0 auto;color:currentColor}
 .ma-direct-icon svg{display:block;width:20px;height:20px}
 .ma-direct-chevron{width:10px;height:10px;flex:0 0 auto}
-.ma-direct-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:30;display:grid;gap:3px;width:max-content;min-width:196px;padding:6px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 30px color-mix(in srgb,var(--dsw-alias-label-primary) 16%,transparent);color:var(--dsw-alias-label-primary)}
-.ma-direct-option{display:flex;align-items:center;gap:9px;width:100%;min-height:36px;padding:6px 9px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.ma-direct-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:1100;display:grid;gap:2px;width:max-content;min-width:196px;padding:5px;border:0;border-radius:var(--dsw-radius-lg,16px);--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);background:linear-gradient(var(--dsw-menu-surface-fill,var(--dsw-specific-menu,var(--dsw-alias-bg-layer-1))),var(--dsw-menu-surface-fill,var(--dsw-specific-menu,var(--dsw-alias-bg-layer-1)))),var(--dsw-alias-bg-base);box-shadow:var(--dsw-elevation-prominent,0 10px 30px color-mix(in srgb,var(--dsw-alias-label-primary) 16%,transparent));color:var(--dsw-alias-label-primary)}
+.ma-direct-option{display:flex;align-items:center;gap:9px;width:100%;min-height:36px;padding:6px 9px;border:0;border-radius:var(--dsw-radius-md,12px);background:transparent;color:inherit;font:inherit;font-size:13px;text-align:left;cursor:pointer}
 .ma-direct-option:hover,.ma-direct-option[aria-checked=true]{background:var(--dsw-alias-interactive-bg-hover)}
 .ma-direct-option[aria-checked=true]{color:var(--dsw-alias-brand-primary);font-weight:600}
 .ma-direct-option-label{flex:1 1 auto;white-space:nowrap}
 .ma-direct-check{width:12px;text-align:center}
+.ma-direct-user-row{display:flex;justify-content:flex-end;width:100%}
+.ma-direct-user-stack{display:flex;flex-direction:column;align-items:flex-end;max-width:100%}
+.ma-direct-user-bubble{max-width:min(720px,100%);border-radius:14px;background:var(--dsw-alias-interactive-bg-hover);padding:9px 14px;overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){.ma-direct-entry *{transition:none!important;transform:none!important}}
 `
 
@@ -65,6 +72,7 @@ window.__ModuleLoader__.load({
     function createSelectionStore() {
       const listeners = new Set()
       const values = new Map()
+      let activeSessionId
       const read = (sessionId) => {
         if (!sessionId) return 'main'
         if (values.has(sessionId)) return values.get(sessionId)
@@ -76,19 +84,32 @@ window.__ModuleLoader__.load({
         values.set(sessionId, value)
         return value
       }
+      const notify = () => {
+        for (const listener of [...listeners]) {
+          try { listener() } catch (error) {
+            if (typeof console !== 'undefined') console.error?.('[dsh-multi-agent] direct selection listener failed:', error)
+          }
+        }
+      }
       return {
         get: read,
+        getActive: () => activeSessionId,
+        activate(sessionId) {
+          if (!sessionId || activeSessionId === sessionId) return
+          activeSessionId = sessionId
+          notify()
+        },
         set(sessionId, value) {
           if (!sessionId || !OPTION_IDS.has(value) || read(sessionId) === value) return
           values.set(sessionId, value)
           try { window.localStorage?.setItem(`${STORAGE_PREFIX}${sessionId}`, value) } catch {}
-          for (const listener of [...listeners]) listener()
+          notify()
         },
         subscribe(listener) {
           listeners.add(listener)
           return () => listeners.delete(listener)
         },
-        dispose() { listeners.clear(); values.clear() },
+        dispose() { activeSessionId = undefined; listeners.clear(); values.clear() },
       }
     }
 
@@ -192,38 +213,84 @@ window.__ModuleLoader__.load({
       })
     }
 
+    function mirrorAgentOf(commandId) {
+      if (typeof commandId !== 'string' || !commandId.startsWith(MIRROR_MSG_PREFIX)) return undefined
+      const agent = commandId.slice(MIRROR_MSG_PREFIX.length).split('--')[0]
+      return DIRECT_AGENTS.includes(agent) ? agent : 'dsh'
+    }
+
     function directAssistantDefinition() {
       return {
         kind: 'multi-agent-direct-assistant',
         target: 'chat',
         match(event) {
-          if (event.type !== 'assistant/message' || event.surfaceOp !== 'append') return null
-          const message = event.data?.message
-          if (message?.source?.kind !== 'model' || !String(message.source.provider || '').startsWith('multi-agent-')) return null
-          return { id: message.id || `direct-${event.seq}`, role: 'start', exclusive: true }
+          if (event.type !== 'command/done') return null
+          if (event.data?.kind !== 'success' || typeof event.data?.text !== 'string' || !event.data.text) return null
+          const agent = mirrorAgentOf(event.data?.commandId)
+          if (!agent) return null
+          return { id: `direct-assistant-${event.data.commandId}`, role: 'start', exclusive: true }
         },
         start(_context, match) { return match.event },
         update(_context, match) { return match.event },
         buildViewNode(context) {
           const event = context.state
           if (!event) return null
-          const message = event.data.message
-          const blocks = directAssistantBlocks(message.content)
+          const agent = mirrorAgentOf(event.data.commandId)
+          const blocks = directAssistantBlocks([{ type: 'text', text: event.data.text }])
           const finalNode = {
-            kind: 'assistant', seq: event.seq, messageId: message.id, time: event.time,
+            kind: 'assistant', seq: event.seq, messageId: event.data.commandId, time: event.time,
             turn: event.data.turn, step: event.data.step, blocks,
-            providerMetadata: { provider: message.source.provider, model: message.source.model },
+            providerMetadata: { provider: `multi-agent-${agent}`, model: agent },
             timing: { stepStartTime: null, firstTokenTime: null, completedTime: event.time },
           }
           return {
             key: context.key, kind: 'assistant-step', id: context.id, target: 'chat',
-            anchorSeq: event.seq,
+            anchorSeq: event.seq - 0.1,
             location: context.start?.location ?? { kind: 'unresolved' },
             visibility: 'visible',
             data: { status: 'settled', turn: event.data.turn, step: event.data.step, blocks, time: event.time, finalNode },
           }
         },
       }
+    }
+
+    function directUserInputDefinition() {
+      return {
+        kind: 'multi-agent-direct-input',
+        target: 'chat',
+        match(event) {
+          if (event.type !== 'command/run') return null
+          if (!COMMAND_NAMES.has(event.data?.name)) return null
+          if (String(event.data?.commandId ?? '').startsWith(MIRROR_MSG_PREFIX)) return null
+          if (typeof event.data?.args !== 'string' || !event.data.args.trim()) return null
+          return { id: `direct-input-${event.data.commandId}`, role: 'start', exclusive: true }
+        },
+        start(_context, match) { return match.event },
+        update(_context, match) { return match.event },
+        buildViewNode(context) {
+          const event = context.state
+          if (!event) return null
+          return {
+            key: context.key, kind: 'multi-agent-direct-input', id: context.id, target: 'chat',
+            anchorSeq: event.seq - 0.1,
+            location: context.start?.location ?? { kind: 'unresolved' },
+            visibility: 'visible',
+            data: { commandId: event.data.commandId, text: event.data.args, time: event.time },
+          }
+        },
+      }
+    }
+
+    function DirectUserInputView(props) {
+      const node = props?.node
+      const data = node?.data
+      if (!data || typeof data.text !== 'string') return null
+      const inner = props.renderFactorySlot
+        ? props.renderFactorySlot('conversation.user.text', { text: data.text, facts: { commands: [] }, interactive: false })
+        : data.text
+      return h('div', { className: 'ma-direct-user-row', 'data-direct-input': '' },
+        h('div', { className: 'ma-direct-user-stack' },
+          h('div', { className: 'ma-direct-user-bubble' }, inner)))
     }
 
     function DirectActivity(props) {
@@ -233,6 +300,7 @@ window.__ModuleLoader__.load({
       const previous = useRef(selected)
       const draft = input?.draft || ''
       const phase = input?.phase
+      useEffect(() => { store.activate(sessionId) }, [store, sessionId])
       useEffect(() => {
         const ownClaim = phase === 'claimed' && COMMAND_NAMES.has(input?.claim?.name)
         if (!input || (phase !== 'plain' && !ownClaim)) return
@@ -261,6 +329,10 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, DICT), 'multi-agent direct: dictionaries')
         ctx.effect(() => ctx.uiConversation.events.register(directAssistantDefinition()), 'multi-agent direct: assistant Conversation nodes')
+        ctx.effect(() => ctx.uiConversation.events.register(directUserInputDefinition()), 'multi-agent direct: user input Conversation nodes')
+        ctx.effect(() => ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
+          name: 'conversation.chat.node', key: 'multi-agent-direct-input', locale: NS,
+        }, DirectUserInputView)), 'multi-agent direct: user input bubble view')
         const t = ctx.locale.bind(NS)
         const store = createSelectionStore()
         shared.directAgentStore = store
@@ -269,7 +341,7 @@ window.__ModuleLoader__.load({
           if (shared.directAgentStore === store) delete shared.directAgentStore
         }, 'multi-agent direct: selection store')
         ctx.effect(() => ctx.slots.inject('conversation.input.activity', () => ctx.slots.register({
-          name: 'conversation.input.activity', locale: NS,
+          name: 'conversation.input.activity', priority: -5, locale: NS,
         }, (props) => h(DirectActivity, { ...props, store, t: props?.t || t }))), 'multi-agent direct: native composer picker')
         ctx.effect(() => ctx.slots.inject('conversation.chat.commandview', () => {
           const disposers = [...COMMAND_NAMES].map((key) => ctx.slots.register({

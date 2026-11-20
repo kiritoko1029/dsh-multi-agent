@@ -36,6 +36,7 @@ export const Config = z.object({
     defaultProvider: z.string().min(1).volatile(),
     defaultModel: z.string().min(1).volatile(),
     defaultReasoningEffort: z.string().min(1).volatile(),
+    directSandboxMode: z.union(['default', 'read-only', 'workspace-write', 'danger-full-access']).default('default').volatile(),
   }).default({}),
   routes: z.array(z.object({
     agent: AgentId,

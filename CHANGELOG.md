@@ -2,6 +2,28 @@
 
 本项目的更新日志遵循 [Keep a Changelog] 风格，版本编号遵循 [语义化版本]。历史条目按现有说明与验证记录整理；无法确认发布日期的版本不标注日期。
 
+## [0.14.0] - 2026-11-20
+
+### 新增
+
+- 在对话框切换子 Agent 后，原生模型与权限位置同步切换为该 Agent 的控件：可调整模型、思考程度和访问权限，切回 DSH 主 Agent 时恢复原控件。
+- 模型菜单支持 Provider 分组、搜索、默认路由与思考强度；权限菜单支持 Provider 原生策略、DSH 沙箱模式和高风险权限确认。
+- 直连续接会应用当前选择的模型、思考程度与权限；DSH 子会话在启动、在线续接及冷恢复时同步应用模型和沙箱配置。
+- 直聊用户消息新增原生聊天气泡：由合法 `command/run` 事件锚定（`recordInput` 持久化输入文本），跨重启可见。
+
+### 修复
+
+- 直聊镜像不再向父会话日志写入无 `turn/start`/`step/start` 包裹的 `user/message`/`assistant/message` 事件——该写法能通过存活期追加校验，但重启后历史加载被网关重放校验判定 `stored log is corrupt`，整个会话无法打开。子 Agent 回复改由合成 `command/run`+`command/done` 生命周期对承载（log-only、无需打开 turn/step、通过存储日志重放校验），用户气泡复用原生命令事件，面板续接补写合成用户侧命令对。
+- 直聊镜像消息不再进入主 Agent 的请求上下文（原 `surfaceOp: append` 写法会把子 Agent 回复混入父会话 Prompt）；命令事件同时被 turnOutline、sessionStats 等投影忽略，不再污染会话统计。
+- 修复子 Agent 模型/权限控件以默认 `priority: 0` 注册导致与原生 `single` slot 冲突、点击 Agent 选择器无反应的问题（改用 `priority: -5` 遮蔽原生控件，同时隔离选择 store 监听异常并去除 `client-bundle` 中重复的 `tasks.apply` 注入）。
+- 同步 Agent 选择器与模型/权限弹窗材质为 DSH 原生 `MenuSurface` 主题 token（`--dsw-menu-surface-fill` + `--dsw-alias-bg-base`、`--dsw-elevation-prominent`、`--dsw-radius-lg`），修复暗色模式下弹窗背景过浅的问题。
+
+### 验证
+
+- 新增控件配置写入、主 Agent 控件恢复、高风险权限确认、DSH 模型/沙箱应用及 Codex、ACP 直连续接协议回归测试。
+- 覆盖严格降权、运行中/隐藏任务权限覆盖清理、慢目录失败重试、当前模型继承、限制应用失败拒绝创建、以及 `single` slot 优先级遮蔽与去重注册；`npm test` 496 项全部通过，Client 构建、语法和真实 rc.5 assembler 验证通过。
+- 新增 `scripts/verify-direct-log-replay.mjs`：用安装包内真实 `assertReleasedV4Relationships` 与 `Session.fromRestore` 校验合成镜像事件及整份存储日志（含 seq 重排与 `headerSeq`/`sourceEventSeq`/`surfaceOp`/`sourceEventSeqs` 引用重映射），并已用它修复一台机器上因旧写法损坏的会话日志。
+
 ## [0.13.0] - 2026-11-20
 
 ### 新增

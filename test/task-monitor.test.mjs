@@ -212,6 +212,21 @@ test('task retention keeps running records even when terminal capacity is full',
   assert.ok(tasks.detail('parent-a', `child-${TASK_RECORD_LIMIT + 19}`))
 })
 
+test('direct permission reset includes running and hidden continuation records', async () => {
+  const { tasks } = harness()
+  tasks.ctx.subagents = { getProvider: () => ({ taskPermissionAgent: 'codex' }) }
+  const trace = tasks.begin({ parentSessionId: 'parent-a', agent: 'codex', label: 'direct', cwd: '/workspace', direct: true, providerName: 'codex-router' })
+  tasks.bind(trace, 'direct-child')
+  const record = trace.record
+  record.continuation = { agent: 'codex', sessionId: 'thread-1' }
+  record.permissionChoice = 'subagent:full-access'
+  record.hidden = true
+  const result = await tasks.resetDirectPermission('parent-a', 'codex')
+  assert.deepEqual(result, { reset: true, childId: 'direct-child' })
+  assert.equal(record.permissionChoice, 'default')
+  assert.equal(tasks.getRecord('parent-a', 'direct-child').permissionChoice, 'default')
+})
+
 test('retention never evicts running work when every record is active', () => {
   const { tasks, begin } = harness()
   for (let index = 0; index <= TASK_RECORD_LIMIT; index++) {

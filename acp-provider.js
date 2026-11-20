@@ -549,14 +549,14 @@ async function startAcpRun(request, spec) {
         }
         /* v8 ignore next -- cancelSettled wins the startup race before this post-response guard can settle it. */
         if (flags.cancelled) throw new Error('subagent cancelled before the ACP session started')
-        if (!spec.resume && spec.model !== undefined) {
+        if ((!spec.resume || spec.applyConfigOnResume) && spec.model !== undefined) {
           startupStage = 'set-model'
           const configured = await setSessionConfig(agent, sessionId, session, 'model', spec.model, spec.thinkingConfigId, spec.validateModel)
           if (Array.isArray(configured.configOptions)) session.configOptions = configured.configOptions
           tasks?.setTelemetry?.(modelTelemetry(spec.model, undefined, 'configured'))
           tasks?.setTelemetry?.(acpConfigTelemetry(configured.configOptions))
         }
-        if (!spec.resume && spec.reasoningEffort !== undefined) {
+        if ((!spec.resume || spec.applyConfigOnResume) && spec.reasoningEffort !== undefined) {
           startupStage = 'set-reasoning-effort'
           const configured = await setSessionConfig(agent, sessionId, session, spec.thinkingConfigId, spec.reasoningEffort, spec.thinkingConfigId, spec.validateModel)
           if (Array.isArray(configured.configOptions)) session.configOptions = configured.configOptions
@@ -715,7 +715,7 @@ export class AcpProvider {
       trace, agent: this.dialect.agent, ctx: this.ctx, parent: request.parent, signal: request.signal,
       agentLabel: this.dialect.label, policy: currentValue(this.config.permission),
       subagentMode: currentValue(this.config.subagentPermissionMode),
-      launcher: (policy, mode, fullAccess, choice) => flag && (fullAccess || (policy === 'subagent' && mode === 'full-access') || (choice === 'default' && args.includes(flag)))
+      launcher: (policy, mode, fullAccess, choice) => flag && (fullAccess || (policy === 'subagent' && mode === 'full-access') || (choice === 'default' && args.includes(flag) && trace?.record?.direct !== true))
         ? 'acp-bypass' : 'acp',
     })
     const launchArgs = flag ? args.filter((arg) => arg !== flag) : args
@@ -733,6 +733,7 @@ export class AcpProvider {
       validateModel: this.dialect.validateModel,
       preferLoad: this.dialect.preferLoad,
       requireHistory: this.dialect.requireHistory,
+      applyConfigOnResume: trace?.record?.direct === true,
       label: this.dialect.label,
       disposeEofGraceMs: this.config.disposeEofGraceMs,
       disposeGraceMs: this.config.disposeGraceMs,

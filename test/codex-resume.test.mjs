@@ -196,11 +196,11 @@ function harness(overrides = {}) {
   return { provider, values, saved, errors, state }
 }
 
-async function start(harness, { resume, cwd = process.cwd(), savedCwd = process.cwd(), trace = true, signal = AbortSignal.timeout(5000) } = {}) {
+async function start(harness, { resume, cwd = process.cwd(), savedCwd = process.cwd(), trace = true, direct = false, signal = AbortSignal.timeout(5000) } = {}) {
   const context = trace === false ? undefined : resume === undefined ? {
-    record: { cwd: savedCwd, agent: 'codex' },
+    record: { cwd: savedCwd, agent: 'codex', ...(direct ? { direct: true } : {}) },
   } : {
-    record: { cwd: savedCwd },
+    record: { cwd: savedCwd, ...(direct ? { direct: true } : {}) },
     resume: { agent: 'codex', sessionId: resume },
   }
   return runWithTaskTrace(context, () => harness.provider.start({
@@ -257,6 +257,23 @@ test('resume uses only thread/resume and the saved cwd, preserving remote model 
   assert.equal(turn.threadId, 'saved-thread')
   assert.deepEqual(state.saved, [{ agent: 'codex', sessionId: 'saved-thread' }])
   assert.deepEqual(state.state.spawns[0].argv, DEFAULT_ARGV)
+})
+
+test('direct Codex continuation applies the currently selected model and effort', async () => {
+  const state = harness()
+  const { requests } = await successfulRun(state, { resume: 'saved-thread', direct: true })
+  assert.deepEqual(requests.map((request) => request.method), ['initialize', 'thread/resume', 'turn/start'])
+  assert.equal(Object.hasOwn(requests[1].params, 'model'), false)
+  assert.equal(requests[2].params.model, 'configured-model')
+  assert.equal(requests[2].params.effort, 'high')
+})
+
+test('direct Codex reject removes inherited native bypass and auto review', async () => {
+  const state = harness({ permissionPolicy: 'reject', permissionMode: 'never' })
+  const { requests } = await successfulRun(state, { resume: 'saved-thread', direct: true })
+  assert.equal(requests[1].params.approvalPolicy, 'never')
+  assert.equal(Object.hasOwn(requests[1].params, 'approvalsReviewer'), false)
+  assert.notEqual(requests[1].params.sandbox, 'danger-full-access')
 })
 
 test('manual CLI argv preserves the entire trimmed path and all process and turn settings', async () => {
