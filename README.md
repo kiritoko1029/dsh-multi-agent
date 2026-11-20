@@ -24,6 +24,12 @@
 
 版本变更只记录在 [更新日志](CHANGELOG.md)，不在 README 重复维护。0.9.3 起稳定版同步到 [npm 包 `@kiritoko1029/dsh-multi-agent`](https://www.npmjs.com/package/@kiritoko1029/dsh-multi-agent)；历史版本不追溯发布。
 
+## 对话内直连 Agent
+
+输入框工具区的 Agent 图标可切换消息接收方。**所有 Agent 都保留 DSH 原生输入框**，包括原生编辑器、附件区、模型选择、Enter 行为和发送按钮。选择 **Codex、Kimi Code、Antigravity（agy）或 DSH 子 Agent** 后，插件只在原生草稿中维护对应的内部命令前缀，不创建自定义 textarea 或替代输入面板。
+
+直连消息通过 DSH 原生命令提交层发送给所选 Agent，不经过主 Agent 模型转发，也不要求主 Agent 调用工具。文本与原生附件块会一起交给目标 Provider，实际附件能力取决于对应 Agent。回复以 DSH 原生助手消息写入当前会话；同一 Agent 的下一条消息自动续接原子会话。工具调用明细、权限、Token 与运行状态继续显示在现有 Agent 任务面板中。直连运行期间请等待当前回复完成；切换 Agent 会开始该 Agent 的新会话，切回主 Agent 则移除内部前缀并恢复普通发送。
+
 ## DSH 版本兼容
 
 **0.11.2 起仅支持 DSH `0.2.2-rc.5`**，`engines.dsh` 已同步更新。其它版本不属于当前兼容范围，不要通过版本豁免强行安装。

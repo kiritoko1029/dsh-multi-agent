@@ -21,9 +21,14 @@ function stageBuildRoot(t) {
   })
   mkdirSync(join(tempRoot, 'scripts'), { recursive: true })
   mkdirSync(join(tempRoot, 'lib'), { recursive: true })
+  mkdirSync(join(tempRoot, 'assets', 'icons'), { recursive: true })
   cpSync(join(root, 'package.json'), join(tempRoot, 'package.json'))
   cpSync(join(root, 'client.js'), join(tempRoot, 'client.js'))
   cpSync(join(root, 'tasks-client.js'), join(tempRoot, 'tasks-client.js'))
+  cpSync(join(root, 'direct-client.js'), join(tempRoot, 'direct-client.js'))
+  for (const icon of ['deepseek', 'openai', 'kimi', 'google']) {
+    cpSync(join(root, 'assets', 'icons', `${icon}.svg`), join(tempRoot, 'assets', 'icons', `${icon}.svg`))
+  }
   cpSync(join(root, 'lib', 'ui-theme.js'), join(tempRoot, 'lib', 'ui-theme.js'))
   cpSync(join(root, 'lib', 'task-indicator-store.js'), join(tempRoot, 'lib', 'task-indicator-store.js'))
   cpSync(join(root, 'scripts', 'build-client.mjs'), join(tempRoot, 'scripts', 'build-client.mjs'))
@@ -54,13 +59,15 @@ function assertBundleRuntime(source) {
     assert.equal(id, 'react', 'third-party parser and internal theme module must not need a Host runtime module')
     return { createElement() {}, memo: component => component }
   })
-  assert.deepEqual(imports, ['react', 'react'])
+  assert.deepEqual(imports, ['react', 'react', 'react'])
   assert.equal(typeof plugin.apply, 'function')
   assert.equal(sandbox.markdownit, undefined, 'parser must not leak a global')
   assert.ok(source.includes('markdown-it 14.1.0'))
   assert.ok(source.includes('THIRD_PARTY_NOTICES.md'))
   assert.ok(source.includes(THEME_STORAGE_KEY))
   assert.ok(source.includes(THEME_CHANGE_EVENT))
+  assert.ok(source.includes('ctx.inject(direct.inject'), 'direct Client must apply within its declared injection scope')
+  assert.ok(!source.includes('direct.apply(ctx);'), 'direct Client must not bypass its injection contract')
   for (const id of THEME_IDS) {
     assert.ok(source.includes(`'${id}'`), `bundle must declare theme id ${id}`)
   }

@@ -461,7 +461,7 @@ window.__ModuleLoader__.load({
 .ma-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .ma-field{display:grid;gap:6px;min-width:0;font-size:12.5px;line-height:1.4}
 .ma-field>span{font-weight:560;color:var(--ma-text)}
-.ma-field input,.ma-field select,.ma-field textarea{width:100%;min-width:0;min-height:36px;padding:7px 11px;border:1px solid var(--ma-control-border);border-radius:9px;background:var(--ma-surface-sunken);color:var(--ma-text);font:inherit;font-size:13px;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
+.ma-field input,.ma-field select,.ma-field textarea{width:100%;min-width:0;min-height:34px;padding:6px 11px;border:1px solid var(--ma-control-border);border-radius:9px;background:var(--ma-surface-sunken);color:var(--ma-text);font:inherit;font-size:13px;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
 .ma-field input:hover:not(:disabled),.ma-field select:hover:not(:disabled),.ma-field textarea:hover:not(:disabled){border-color:var(--ma-accent)}
 .ma-field input:focus,.ma-field select:focus,.ma-field textarea:focus{background:var(--ma-surface);border-color:var(--ma-accent);box-shadow:0 0 0 3px var(--ma-focus-ring)}
 .ma-field textarea{min-height:84px;padding:9px 11px;resize:vertical;line-height:1.55}

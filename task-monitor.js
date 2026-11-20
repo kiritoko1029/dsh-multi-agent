@@ -90,6 +90,7 @@ const storedTaskSchema = z.object({
   status: z.string(), startedAt: z.number(), updatedAt: z.number(), finishedAt: z.number().optional(),
   archived: z.boolean(), hidden: z.boolean(), continuationCount: z.number().default(0),
   continuation: z.object({ agent: z.enum(['codex', 'kimi-code', 'agy']), sessionId: z.string().min(1) }).optional(),
+  direct: z.boolean().default(false),
   output: z.string().optional(), diagnostic: z.string().optional(), truncated: z.boolean().default(false),
   permissionChoice: z.enum(CODEX_PERMISSION_CHOICES).optional(),
   nativeSandboxDefault: z.enum(NATIVE_SANDBOX_MODES).optional(),
@@ -178,7 +179,8 @@ export class MultiAgentTasks extends Service {
       language: record.language, activeChildId: record.activeChildId, aliases: [...record.aliases],
       status: record.status, startedAt: record.startedAt, updatedAt: record.updatedAt, finishedAt: record.finishedAt,
       archived: Boolean(record.archived), hidden: Boolean(record.hidden), continuationCount: record.continuationCount || 0,
-      continuation: record.continuation, output: record.output, diagnostic: record.diagnostic, truncated: record.truncated,
+      continuation: record.continuation, direct: record.direct === true,
+      output: record.output, diagnostic: record.diagnostic, truncated: record.truncated,
       permissionChoice: record.permissionChoice, nativeSandboxDefault: record.nativeSandboxDefault,
       telemetry: record.telemetry,
       nativeSeq: record.nativeSeq,
@@ -206,10 +208,30 @@ export class MultiAgentTasks extends Service {
     return () => { if (this.continuationHandler === handler) this.continuationHandler = undefined }
   }
 
+  registerDirectHandler(handler) {
+    this.directHandler = handler
+    return () => { if (this.directHandler === handler) this.directHandler = undefined }
+  }
+
+  setDirectMirror(mirror) {
+    this.directMirror = mirror
+    return () => { if (this.directMirror === mirror) this.directMirror = undefined }
+  }
+
+  async directChat(agent, args) {
+    await this.ready
+    this.assertStorageAvailable()
+    if (!isRootAgent(this.ctx, agent)) throw new Error('Only the exact parent root agent may use direct Agent chat')
+    if (!this.directHandler) throw new Error('Direct Agent chat is temporarily unavailable')
+    return this.directHandler(agent, { agent: args?.agent, message: args?.message })
+  }
+
   async continueTask(agent, args, signal) {
     await this.ready
     this.assertStorageAvailable()
     if (!isRootAgent(this.ctx, agent)) throw new Error('Only the exact parent root agent may continue its tasks')
+    const existing = this.getRecord(agent.session.id, args?.childId)
+    if (existing?.direct) return this.directChat(agent, { agent: existing.agent, message: args.message })
     if (!this.continuationHandler) throw new Error('Task continuation is temporarily unavailable')
     return this.continuationHandler(agent, args, signal)
   }
@@ -237,6 +259,7 @@ export class MultiAgentTasks extends Service {
     delete record.lastNativeOutput
     record.tools = new Map()
     record.messages = new Map()
+    this.directMirror?.reset(record)
     this.replayNativeTelemetry(record)
     this.append(trace, { type: 'status', title: 'Task continuation requested', status: 'starting' })
     this.persist(record)
@@ -503,7 +526,7 @@ export class MultiAgentTasks extends Service {
     }
   }
 
-  begin({ parentSessionId, agent, label, cwd, reportPath, providerName, language }) {
+  begin({ parentSessionId, agent, label, cwd, reportPath, providerName, language, direct = false }) {
     this.assertStorageAvailable()
     const time = this.timestamp()
     const record = {
@@ -514,6 +537,7 @@ export class MultiAgentTasks extends Service {
       reportPath,
       providerName,
       language,
+      direct: direct === true,
       generation: 1,
       aliases: new Set(),
       continuationCount: 0,
@@ -601,6 +625,9 @@ export class MultiAgentTasks extends Service {
     record.finishedAt = finishedAt
     record.archived = true
     this.persist(record)
+    if (record.direct) {
+      try { this.directMirror?.settle(record, result) } catch {}
+    }
     for (const callback of trace.settledCallbacks) {
       try { callback() } catch {}
     }
@@ -630,6 +657,9 @@ export class MultiAgentTasks extends Service {
     }
     record.activities.push(stored)
     this.touch(record)
+    if (record.direct) {
+      try { this.directMirror?.activity(record, stored) } catch {}
+    }
     return stored
   }
 
@@ -760,6 +790,7 @@ export class MultiAgentTasks extends Service {
       parentSessionId: record.parentSessionId,
       agent: record.agent,
       label: record.label,
+      direct: record.direct === true,
       cwd: record.cwd,
       reportPath: record.reportPath,
       status: record.status,
@@ -777,6 +808,7 @@ export class MultiAgentTasks extends Service {
       ...record.output === undefined ? {} : { output: clipped(record.output, 600).value },
       ...record.diagnostic === undefined ? {} : { diagnostic: clipped(record.diagnostic, 600).value },
       ...record.truncated ? { truncated: true } : {},
+      ...record.mirrorError ? { mirrorError: record.mirrorError } : {},
       ...record.telemetry === undefined ? {} : { telemetry: record.telemetry },
     }
   }
@@ -784,8 +816,21 @@ export class MultiAgentTasks extends Service {
   list(parentSessionId) {
     const tasks = [...this.records].filter((record) => typeof record.childId === 'string' && record.parentSessionId === parentSessionId && !record.hidden)
       .map((record) => this.summary(record))
-  return { revision: this.revision, tasks, ...(this.storageError ? { storageWarning: this.storageError } : {}) }
-}
+    return { revision: this.revision, tasks, ...(this.storageError ? { storageWarning: this.storageError } : {}) }
+  }
+
+  directStatus(parentSessionId) {
+    const records = [...this.records].filter((record) => record.direct && record.parentSessionId === parentSessionId)
+    const active = records.filter((record) => !TERMINAL_STATUSES.has(record.status) || record.nativeAwaitingEnd || record.trace.admissionPending)
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0]
+    const latest = records.sort((left, right) => right.updatedAt - left.updatedAt)[0]
+    return {
+      active: Boolean(active),
+      ...(active?.childId ? { childId: active.childId, agent: active.agent } : {}),
+      ...(active ? { reason: active.nativeAwaitingEnd ? 'native-awaiting-end' : active.trace.admissionPending ? 'admission-pending' : 'running' } : {}),
+      ...(latest?.mirrorError ? { mirrorError: latest.mirrorError } : {}),
+    }
+  }
 
   nativePermissionTarget(record) {
     const id = record.activeChildId || record.childId
@@ -910,6 +955,10 @@ export class MultiAgentTasks extends Service {
           const agent = findRootAgent(this.ctx, args.parentSessionId)
           if (!agent) throw new Error('Open the parent conversation before continuing this task')
           value = await this.continueTask(agent, { childId: args.childId, message: args.message }, new AbortController().signal)
+        } else if (args.action === 'direct') {
+          const agent = findRootAgent(this.ctx, args.parentSessionId)
+          if (!agent) throw new Error('Open the parent conversation before starting direct Agent chat')
+          value = await this.directChat(agent, args)
         } else if (args.action === 'set-permission') {
           value = await this.setTaskPermission(args.parentSessionId, args.childId, args.choice)
         } else value = this.manage(args.parentSessionId, args)
@@ -932,6 +981,10 @@ export class MultiAgentTasks extends Service {
         return
       }
       this.sendJson(res, 200, { ok: true, value: { proof: this.panelProof(parentSessionId) } })
+      return
+    }
+    if (url.searchParams.get('view') === 'direct-status') {
+      this.sendJson(res, 200, { ok: true, value: this.directStatus(parentSessionId) })
       return
     }
     if (url.searchParams.has('childId')) {

@@ -282,7 +282,7 @@ window.__ModuleLoader__.load({
 .matasks button:active:not(:disabled){transform:translateY(1px)}
 .matasks button:disabled{opacity:.52;cursor:not-allowed}
 .matasks :is(button,summary,select,input,textarea,a):focus-visible,.matasks-activity-viewport:focus-visible,.matasks-empty:focus-visible,.matasks-empty:focus{outline:2px solid var(--ma-accent);outline-offset:2px}
-.matasks :is(input,select,textarea){border:1px solid var(--ma-control-border);border-radius:8px;background:var(--ma-surface-sunken);color:var(--ma-text);font:inherit;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
+.matasks :is(input,select,textarea){min-height:34px;padding:6px 11px;border:1px solid var(--ma-control-border);border-radius:8px;background:var(--ma-surface-sunken);color:var(--ma-text);font:inherit;transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}
 .matasks :is(input,select,textarea):hover:not(:disabled){border-color:var(--ma-accent)}
 .matasks :is(input,select,textarea):focus{background:var(--ma-surface);border-color:var(--ma-accent);box-shadow:0 0 0 3px var(--ma-focus-ring)}
 .matasks-icon{width:15px;height:15px;flex:0 0 auto}

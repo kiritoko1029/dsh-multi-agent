@@ -5,13 +5,14 @@ import { agentConfigs, askAgent, composeTaskPrompt, routingGuidance, validateAge
 import { currentRouterConfig } from './lib/config.js'
 import { resolveReportPath } from './lib/reports.js'
 import { createDshModelResolver } from './lib/dsh-model.js'
+import { registerDirectChat } from './lib/direct-chat.js'
 import { createTaskLanguageResolver } from './lib/task-language.js'
 import { registerTaskContinuation } from './lib/task-continuation.js'
 import { isRootAgent, isModernSubagentRuntime, startManagedActivation } from './lib/runtime-compat.js'
 import { registerAgentTasksTool, runWithTaskTrace } from './task-monitor.js'
 
 export const name = 'multi-agent-router'
-export const inject = ['tools', 'subagents', 'systemPrompt', 'userQuestions', 'agents', 'workingDirectory', 'sessionProjections', 'llm', 'multiAgentTasks']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'userQuestions', 'agents', 'workingDirectory', 'sessionProjections', 'llm', 'multiAgentTasks', 'commands']
 
 const AgentId = z.union(['codex', 'kimi-code', 'agy', 'dsh'])
 const AgentConfig = (providerName, label, description) => z.object({
@@ -110,6 +111,9 @@ export function apply(ctx, config) {
   const tasks = ctx.multiAgentTasks
   const dispatchTask = createDispatcher()
   registerAgentTasksTool(ctx, tasks)
+  registerDirectChat(ctx, {
+    tasks, getSettings: () => currentRouterConfig(config), resolveDshModel: createDshModelResolver(ctx),
+  })
   registerTaskContinuation(ctx, {
     tasks, resolveTaskLanguage, getSettings: () => currentRouterConfig(config),
     dispatchSelected: dispatchTask, dispatchOutput: output,
